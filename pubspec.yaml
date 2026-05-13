@@ -1,0 +1,34 @@
+name: cmandili_admin
+description: "A new Flutter project."
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.11.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_riverpod: ^2.4.9
+  supabase_flutter: ^2.3.0
+  fl_chart: ^0.65.0
+  flutter_map: ^6.1.0
+  google_fonts: ^6.1.0
+  pdf: ^3.10.4
+  printing: ^5.11.0
+  intl: any
+  freezed_annotation: ^2.4.1
+  json_annotation: ^4.9.0
+  uuid: ^4.2.2
+  go_router: ^13.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  build_runner: ^2.4.6
+  freezed: ^2.4.5
+  json_serializable: ^6.7.1
+
+flutter:
+  uses-material-design: true
