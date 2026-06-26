@@ -6,6 +6,7 @@ import {
   LayoutDashboard,
   Truck,
   UtensilsCrossed,
+  ShoppingCart,
   ShoppingBag,
   BarChart3,
 } from "lucide-react";
@@ -14,6 +15,7 @@ const navItems = [
   { href: "/dashboard", label: "Vue d'ensemble", icon: LayoutDashboard },
   { href: "/dashboard/livreurs", label: "Livreurs", icon: Truck },
   { href: "/dashboard/restaurants", label: "Restaurants", icon: UtensilsCrossed },
+  { href: "/dashboard/supermarkets", label: "Supermarchés", icon: ShoppingCart },
   { href: "/dashboard/commandes", label: "Commandes", icon: ShoppingBag },
   { href: "/dashboard/finances", label: "Finances", icon: BarChart3 },
 ];
