@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import DriverRow from "@/components/DriverRow";
 import StatsCard from "@/components/StatsCard";
