@@ -1,11 +1,12 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import StatsCard from "@/components/StatsCard";
+import RestaurantRow from "@/components/RestaurantRow";
 import { UtensilsCrossed, CircleDollarSign, TrendingUp } from "lucide-react";
 
 async function getRestaurants() {
   const { data: restaurants, error } = await supabaseAdmin
     .from("restaurants")
-    .select("id, name")
+    .select("id, name, is_ghost_restaurant")
     .order("name");
 
   if (error) {
@@ -38,6 +39,7 @@ async function getRestaurants() {
 
   return restaurants.map((r) => ({
     ...r,
+    is_ghost_restaurant: r.is_ghost_restaurant ?? false,
     stats: ordersByRestaurant[r.id] ?? {
       count: 0,
       totalRevenue: 0,
@@ -51,17 +53,24 @@ export default async function RestaurantsPage() {
 
   const totalRevenue = restaurants.reduce((s, r) => s + r.stats.totalRevenue, 0);
   const totalCommissions = restaurants.reduce((s, r) => s + r.stats.totalCommissions, 0);
+  const ghostCount = restaurants.filter((r) => r.is_ghost_restaurant).length;
 
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold text-white">Restaurants & Partenaires</h2>
 
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatsCard
           title="Total restaurants"
           value={restaurants.length}
           icon={UtensilsCrossed}
           color="purple"
+        />
+        <StatsCard
+          title="Restaurants fantômes"
+          value={ghostCount}
+          icon={UtensilsCrossed}
+          color="blue"
         />
         <StatsCard
           title="Chiffre d'affaires total"
@@ -89,22 +98,18 @@ export default async function RestaurantsPage() {
                 <th className="px-5 py-3 font-medium">Commandes livrées</th>
                 <th className="px-5 py-3 font-medium">Chiffre d&apos;affaires</th>
                 <th className="px-5 py-3 font-medium">Commission plateforme</th>
+                <th className="px-5 py-3 font-medium">Solde</th>
+                <th className="px-5 py-3 font-medium">Statut</th>
+                <th className="px-5 py-3 font-medium">Actions</th>
               </tr>
             </thead>
             <tbody>
               {restaurants.map((r) => (
-                <tr key={r.id} className="border-b border-gray-800/50 hover:bg-gray-800/30">
-                  <td className="px-5 py-3 text-white font-medium">{r.name}</td>
-                  <td className="px-5 py-3 text-gray-300">{r.stats.count}</td>
-                  <td className="px-5 py-3 text-gray-300">{r.stats.totalRevenue.toFixed(3)} TND</td>
-                  <td className="px-5 py-3 text-orange-400 font-medium">
-                    {r.stats.totalCommissions.toFixed(3)} TND
-                  </td>
-                </tr>
+                <RestaurantRow key={r.id} restaurant={{ ...r, partner: null, wallet: null }} />
               ))}
               {!restaurants.length && (
                 <tr>
-                  <td colSpan={4} className="px-5 py-8 text-center text-gray-500">
+                  <td colSpan={7} className="px-5 py-8 text-center text-gray-500">
                     Aucun restaurant trouvé
                   </td>
                 </tr>
