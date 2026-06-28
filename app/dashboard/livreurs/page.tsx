@@ -1,3 +1,4 @@
+﻿export const dynamic = 'force-dynamic'
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import DriverRow from "@/components/DriverRow";
 import StatsCard from "@/components/StatsCard";
@@ -90,7 +91,7 @@ export default async function LivreursPage() {
           color="green"
         />
         <StatsCard
-          title="Comptes bloqués"
+          title="Comptes bloquÃ©s"
           value={blockedCount}
           icon={ShieldX}
           color="red"
@@ -98,7 +99,7 @@ export default async function LivreursPage() {
         <StatsCard
           title="Commissions dues"
           value={`${pendingCommissions.toFixed(3)} TND`}
-          subtitle="Soldes négatifs"
+          subtitle="Soldes nÃ©gatifs"
           icon={CircleDollarSign}
           color="orange"
         />
@@ -118,7 +119,7 @@ export default async function LivreursPage() {
                 <th className="px-5 py-3 font-medium">Livreur</th>
                 <th className="px-5 py-3 font-medium">Statut</th>
                 <th className="px-5 py-3 font-medium">Livraisons</th>
-                <th className="px-5 py-3 font-medium">Frais collectés</th>
+                <th className="px-5 py-3 font-medium">Frais collectÃ©s</th>
                 <th className="px-5 py-3 font-medium">Commission due (23%)</th>
                 <th className="px-5 py-3 font-medium">Solde wallet</th>
                 <th className="px-5 py-3 font-medium">Compte</th>
@@ -135,7 +136,7 @@ export default async function LivreursPage() {
                     colSpan={8}
                     className="px-5 py-8 text-center text-gray-500"
                   >
-                    Aucun livreur trouvé
+                    Aucun livreur trouvÃ©
                   </td>
                 </tr>
               )}
@@ -146,3 +147,4 @@ export default async function LivreursPage() {
     </div>
   );
 }
+

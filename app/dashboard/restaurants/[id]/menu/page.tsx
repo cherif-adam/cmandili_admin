@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { notFound } from "next/navigation";
 import GhostMenuClient from "./GhostMenuClient";

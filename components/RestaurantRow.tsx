@@ -9,7 +9,7 @@ interface RestaurantData {
   id: string;
   name: string;
   is_ghost_restaurant?: boolean;
-  partner: { user_id: string; commission_rate: number | null } | null;
+  partner: { id: string; user_id: string; commission_rate: number | null; is_blocked: boolean } | null;
   wallet: { balance: number; status: string } | null;
   stats: { count: number; totalRevenue: number; totalCommissions: number };
 }
@@ -19,19 +19,34 @@ export default function RestaurantRow({ restaurant: r }: { restaurant: Restauran
   const [loading, setLoading] = useState(false);
   const [ghostLoading, setGhostLoading] = useState(false);
   const [isGhost, setIsGhost] = useState(r.is_ghost_restaurant ?? false);
-  const isBlocked = r.wallet?.status === "blocked";
+  const [isBlocked, setIsBlocked] = useState(r.partner?.is_blocked ?? false);
+  const [feedback, setFeedback] = useState<{ ok: boolean; msg: string } | null>(null);
 
   async function toggleBlock() {
-    if (!r.partner?.user_id) return;
+    if (!r.partner?.id) return;
     setLoading(true);
-    const newStatus = isBlocked ? "active" : "blocked";
-    await fetch("/api/block", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user_id: r.partner.user_id, status: newStatus, balance: r.wallet?.balance ?? 0 }),
-    });
-    router.refresh();
-    setLoading(false);
+    setFeedback(null);
+    const newBlocked = !isBlocked;
+
+    try {
+      const res = await fetch("/api/block", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ partner_id: r.partner.id, blocked: newBlocked }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Erreur serveur");
+
+      setIsBlocked(newBlocked);
+      setFeedback({ ok: true, msg: newBlocked ? "Restaurant bloqué" : "Restaurant débloqué" });
+      router.refresh();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Erreur inconnue";
+      setFeedback({ ok: false, msg });
+    } finally {
+      setLoading(false);
+      setTimeout(() => setFeedback(null), 3000);
+    }
   }
 
   async function toggleGhost() {
@@ -94,7 +109,8 @@ export default function RestaurantRow({ restaurant: r }: { restaurant: Restauran
         </span>
       </td>
       <td className="px-5 py-4">
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex flex-col gap-1 items-start">
+          <div className="flex items-center gap-2 flex-wrap">
           {/* Ghost toggle */}
           <button
             onClick={toggleGhost}
@@ -135,6 +151,12 @@ export default function RestaurantRow({ restaurant: r }: { restaurant: Restauran
               {loading ? "..." : isBlocked ? "Débloquer" : "Bloquer"}
             </button>
           ) : null}
+          </div>
+          {feedback && (
+            <span className={`text-xs ${feedback.ok ? "text-green-400" : "text-red-400"}`}>
+              {feedback.msg}
+            </span>
+          )}
         </div>
       </td>
     </tr>

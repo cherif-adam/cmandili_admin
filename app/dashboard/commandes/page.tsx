@@ -1,20 +1,21 @@
+﻿export const dynamic = 'force-dynamic'
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import OrdersTable from "@/components/OrdersTable";
 
 const STATUS_LABELS: Record<string, string> = {
   pending: "En attente",
-  confirmed: "Confirmée",
-  ready: "Prête",
-  picked_up: "Récupérée",
-  delivered: "Livrée",
-  cancelled: "Annulée",
+  confirmed: "ConfirmÃ©e",
+  ready: "PrÃªte",
+  picked_up: "RÃ©cupÃ©rÃ©e",
+  delivered: "LivrÃ©e",
+  cancelled: "AnnulÃ©e",
 };
 
 async function getOrders(status?: string, dateFrom?: string) {
   let query = supabaseAdmin
     .from("orders_with_customer")
     .select(
-      "id, status, created_at, subtotal, delivery_fee, total, platform_fee, driver_fee_cut, payment_method, customer_name, restaurant_id"
+      "id, status, created_at, subtotal, delivery_fee, total, platform_fee, driver_fee_cut, payment_method, customer_name, restaurant_id, driver_id, assigned_driver_id, self_delivery"
     )
     .order("created_at", { ascending: false })
     .limit(200);
@@ -39,7 +40,7 @@ async function getOrders(status?: string, dateFrom?: string) {
 
   return orders.map((o) => ({
     ...o,
-    restaurantName: restaurantMap[o.restaurant_id] ?? "—",
+    restaurantName: restaurantMap[o.restaurant_id] ?? "â€”",
   }));
 }
 
@@ -76,3 +77,4 @@ export default async function CommandesPage({
     </div>
   );
 }
+
