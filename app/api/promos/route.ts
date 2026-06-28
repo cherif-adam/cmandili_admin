@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
+import { logAudit } from "@/lib/audit";
+import type { User } from "@supabase/supabase-js";
 
-async function requireAdmin() {
+async function requireAdmin(): Promise<User | null> {
   const supabase = await createSupabaseServerClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
@@ -13,7 +15,8 @@ async function requireAdmin() {
 
 // POST — create a new promo code
 export async function POST(req: NextRequest) {
-  if (!await requireAdmin()) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const adminUser = await requireAdmin();
+  if (!adminUser) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await req.json();
   const { code, type, value, min_order_amount, max_uses,
@@ -45,18 +48,27 @@ export async function POST(req: NextRequest) {
       : error.message;
     return NextResponse.json({ error: msg }, { status: 400 });
   }
+
+  await logAudit({
+    admin_id: adminUser.id,
+    admin_email: adminUser.email ?? "unknown",
+    action_type: "create_promo",
+    target_type: "promo",
+    target_id: data.id,
+    details: { code: data.code, type: data.type, value: data.value },
+  });
   return NextResponse.json({ ok: true, promo: data });
 }
 
 // PATCH — update an existing promo code (full update or just toggle is_active)
 export async function PATCH(req: NextRequest) {
-  if (!await requireAdmin()) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const adminUser = await requireAdmin();
+  if (!adminUser) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await req.json();
   const { id, ...fields } = body;
   if (!id) return NextResponse.json({ error: "id requis" }, { status: 400 });
 
-  // Normalize numeric fields
   const update: Record<string, unknown> = { ...fields };
   if (fields.code) update.code = (fields.code as string).toUpperCase().trim();
   if (fields.value != null) update.value = Number(fields.value);
@@ -72,17 +84,35 @@ export async function PATCH(req: NextRequest) {
     .eq("id", id);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  await logAudit({
+    admin_id: adminUser.id,
+    admin_email: adminUser.email ?? "unknown",
+    action_type: "update_promo",
+    target_type: "promo",
+    target_id: id,
+    details: update as Record<string, unknown>,
+  });
   return NextResponse.json({ ok: true });
 }
 
 // DELETE — delete a promo code
 export async function DELETE(req: NextRequest) {
-  if (!await requireAdmin()) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const adminUser = await requireAdmin();
+  if (!adminUser) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { id } = await req.json();
   if (!id) return NextResponse.json({ error: "id requis" }, { status: 400 });
 
   const { error } = await supabaseAdmin.from("promo_codes").delete().eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  await logAudit({
+    admin_id: adminUser.id,
+    admin_email: adminUser.email ?? "unknown",
+    action_type: "delete_promo",
+    target_type: "promo",
+    target_id: id,
+  });
   return NextResponse.json({ ok: true });
 }

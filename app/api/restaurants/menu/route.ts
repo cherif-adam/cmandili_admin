@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { logAudit, getSessionUser } from "@/lib/audit";
 
 export async function GET(req: NextRequest) {
   const restaurantId = req.nextUrl.searchParams.get("restaurant_id");
@@ -38,6 +39,16 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  const admin = await getSessionUser();
+  await logAudit({
+    admin_id: admin?.id ?? null,
+    admin_email: admin?.email ?? "unknown",
+    action_type: "add_menu_item",
+    target_type: "food_item",
+    target_id: data.id,
+    details: { name, price: Number(price), restaurant_id },
+  });
   return NextResponse.json(data);
 }
 
@@ -52,6 +63,16 @@ export async function PUT(req: NextRequest) {
     .eq("id", id);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  const admin = await getSessionUser();
+  await logAudit({
+    admin_id: admin?.id ?? null,
+    admin_email: admin?.email ?? "unknown",
+    action_type: "update_menu_item",
+    target_type: "food_item",
+    target_id: id,
+    details: { name, price: Number(price), is_available },
+  });
   return NextResponse.json({ ok: true });
 }
 
@@ -61,5 +82,14 @@ export async function DELETE(req: NextRequest) {
 
   const { error } = await supabaseAdmin.from("food_items").delete().eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  const admin = await getSessionUser();
+  await logAudit({
+    admin_id: admin?.id ?? null,
+    admin_email: admin?.email ?? "unknown",
+    action_type: "delete_menu_item",
+    target_type: "food_item",
+    target_id: id,
+  });
   return NextResponse.json({ ok: true });
 }

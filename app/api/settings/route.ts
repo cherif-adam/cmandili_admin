@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
+import { logAudit } from "@/lib/audit";
 
 export async function POST(req: NextRequest) {
   const supabase = await createSupabaseServerClient();
@@ -37,5 +38,12 @@ export async function POST(req: NextRequest) {
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  await logAudit({
+    admin_id: user.id,
+    admin_email: user.email ?? "unknown",
+    action_type: "update_commission_rates",
+    target_type: "settings",
+    details: { restaurant_rate, driver_rate },
+  });
   return NextResponse.json({ ok: true });
 }

@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
+import { logAudit } from "@/lib/audit";
 
 export async function POST(req: NextRequest) {
-  // Defence-in-depth: verify admin session server-side even though
-  // proxy already guards this route.
   const supabase = await createSupabaseServerClient();
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -36,6 +35,14 @@ export async function POST(req: NextRequest) {
       .eq("id", driver_id);
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    await logAudit({
+      admin_id: user.id,
+      admin_email: user.email ?? "unknown",
+      action_type: blocked ? "block_driver" : "unblock_driver",
+      target_type: "driver",
+      target_id: driver_id,
+    });
     return NextResponse.json({ ok: true });
   }
 
@@ -46,6 +53,14 @@ export async function POST(req: NextRequest) {
       .eq("id", partner_id);
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    await logAudit({
+      admin_id: user.id,
+      admin_email: user.email ?? "unknown",
+      action_type: blocked ? "block_restaurant" : "unblock_restaurant",
+      target_type: "restaurant",
+      target_id: partner_id,
+    });
     return NextResponse.json({ ok: true });
   }
 
@@ -56,6 +71,14 @@ export async function POST(req: NextRequest) {
       .eq("id", customer_id);
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    await logAudit({
+      admin_id: user.id,
+      admin_email: user.email ?? "unknown",
+      action_type: blocked ? "block_customer" : "unblock_customer",
+      target_type: "customer",
+      target_id: customer_id,
+    });
     return NextResponse.json({ ok: true });
   }
 
