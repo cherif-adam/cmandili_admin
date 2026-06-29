@@ -17,7 +17,7 @@ async function getOrders(status?: string, dateFrom?: string) {
   let query = supabaseAdmin
     .from("orders_with_customer")
     .select(
-      "id, status, created_at, subtotal, delivery_fee, total, platform_fee, driver_fee_cut, payment_method, customer_name, restaurant_id, driver_id, assigned_driver_id, self_delivery"
+      "id, status, created_at, subtotal, delivery_fee, total, platform_fee, driver_fee_cut, payment_method, customer_name, restaurant_id, driver_id, assigned_driver_id, self_delivery, cancellation_reason, cancelled_by"
     )
     .order("created_at", { ascending: false })
     .limit(200);

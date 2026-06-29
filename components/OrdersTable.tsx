@@ -18,6 +18,8 @@ interface Order {
   driver_id: string | null;
   assigned_driver_id: string | null;
   self_delivery: boolean;
+  cancellation_reason: string | null;
+  cancelled_by: string | null;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -157,6 +159,12 @@ export default function OrdersTable({
                       )}
                       {stuck && (
                         <span className="text-xs text-red-400 px-2">Sans livreur</span>
+                      )}
+                      {o.status === "cancelled" && o.cancellation_reason && (
+                        <span className="text-xs text-red-400/70 px-1 mt-0.5" title={o.cancellation_reason}>
+                          {o.cancelled_by === "customer" ? "Client : " : ""}
+                          {o.cancellation_reason}
+                        </span>
                       )}
                     </div>
                   </td>

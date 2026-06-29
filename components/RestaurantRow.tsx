@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Ghost, UtensilsCrossed } from "lucide-react";
+import StatementModal from "@/components/StatementModal";
 
 interface RestaurantData {
   id: string;
@@ -16,11 +17,12 @@ interface RestaurantData {
 
 export default function RestaurantRow({ restaurant: r }: { restaurant: RestaurantData }) {
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
-  const [ghostLoading, setGhostLoading] = useState(false);
-  const [isGhost, setIsGhost] = useState(r.is_ghost_restaurant ?? false);
-  const [isBlocked, setIsBlocked] = useState(r.partner?.is_blocked ?? false);
-  const [feedback, setFeedback] = useState<{ ok: boolean; msg: string } | null>(null);
+  const [loading,       setLoading]       = useState(false);
+  const [ghostLoading,  setGhostLoading]  = useState(false);
+  const [isGhost,       setIsGhost]       = useState(r.is_ghost_restaurant ?? false);
+  const [isBlocked,     setIsBlocked]     = useState(r.partner?.is_blocked ?? false);
+  const [feedback,      setFeedback]      = useState<{ ok: boolean; msg: string } | null>(null);
+  const [showStatement, setShowStatement] = useState(false);
 
   async function toggleBlock() {
     if (!r.partner?.id) return;
@@ -57,9 +59,7 @@ export default function RestaurantRow({ restaurant: r }: { restaurant: Restauran
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ restaurant_id: r.id, is_ghost: newVal }),
     });
-    if (res.ok) {
-      setIsGhost(newVal);
-    }
+    if (res.ok) setIsGhost(newVal);
     setGhostLoading(false);
   }
 
@@ -67,6 +67,16 @@ export default function RestaurantRow({ restaurant: r }: { restaurant: Restauran
 
   return (
     <tr className="border-b border-gray-800 hover:bg-gray-800/40 transition-colors">
+      {/* StatementModal renders as position:fixed — visually escapes the table */}
+      {showStatement && (
+        <StatementModal
+          entityType="restaurant"
+          entityId={r.id}
+          entityName={r.name}
+          onClose={() => setShowStatement(false)}
+        />
+      )}
+
       <td className="px-5 py-4">
         <div className="flex items-center gap-2">
           <p className="font-medium text-white">{r.name}</p>
@@ -110,47 +120,55 @@ export default function RestaurantRow({ restaurant: r }: { restaurant: Restauran
       </td>
       <td className="px-5 py-4">
         <div className="flex flex-col gap-1 items-start">
-          <div className="flex items-center gap-2 flex-wrap">
-          {/* Ghost toggle */}
-          <button
-            onClick={toggleGhost}
-            disabled={ghostLoading}
-            title={isGhost ? "Désactiver le mode fantôme" : "Activer le mode fantôme"}
-            className={`flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg font-medium transition-colors disabled:opacity-50 ${
-              isGhost
-                ? "bg-purple-500/20 text-purple-400 hover:bg-purple-500/30"
-                : "bg-gray-700 text-gray-400 hover:bg-gray-600"
-            }`}
-          >
-            <Ghost size={12} />
-            {ghostLoading ? "..." : isGhost ? "Fantôme ON" : "Fantôme"}
-          </button>
-
-          {/* Menu management — only useful for ghost restaurants */}
-          {isGhost && (
-            <Link
-              href={`/dashboard/restaurants/${r.id}/menu`}
-              className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg font-medium bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-colors"
-            >
-              <UtensilsCrossed size={12} />
-              Menu
-            </Link>
-          )}
-
-          {/* Block/unblock — only if there is a partner account */}
-          {r.partner ? (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {/* Ghost toggle */}
             <button
-              onClick={toggleBlock}
-              disabled={loading}
-              className={`text-xs px-2.5 py-1.5 rounded-lg font-medium transition-colors disabled:opacity-50 ${
-                isBlocked
-                  ? "bg-green-500/20 text-green-400 hover:bg-green-500/30"
-                  : "bg-red-500/20 text-red-400 hover:bg-red-500/30"
+              onClick={toggleGhost}
+              disabled={ghostLoading}
+              title={isGhost ? "Désactiver le mode fantôme" : "Activer le mode fantôme"}
+              className={`flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg font-medium transition-colors disabled:opacity-50 ${
+                isGhost
+                  ? "bg-purple-500/20 text-purple-400 hover:bg-purple-500/30"
+                  : "bg-gray-700 text-gray-400 hover:bg-gray-600"
               }`}
             >
-              {loading ? "..." : isBlocked ? "Débloquer" : "Bloquer"}
+              <Ghost size={12} />
+              {ghostLoading ? "..." : isGhost ? "Fantôme ON" : "Fantôme"}
             </button>
-          ) : null}
+
+            {/* Menu management — only useful for ghost restaurants */}
+            {isGhost && (
+              <Link
+                href={`/dashboard/restaurants/${r.id}/menu`}
+                className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg font-medium bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-colors"
+              >
+                <UtensilsCrossed size={12} />
+                Menu
+              </Link>
+            )}
+
+            {/* Block/unblock — only if there is a partner account */}
+            {r.partner && (
+              <button
+                onClick={toggleBlock}
+                disabled={loading}
+                className={`text-xs px-2.5 py-1.5 rounded-lg font-medium transition-colors disabled:opacity-50 ${
+                  isBlocked
+                    ? "bg-green-500/20 text-green-400 hover:bg-green-500/30"
+                    : "bg-red-500/20 text-red-400 hover:bg-red-500/30"
+                }`}
+              >
+                {loading ? "..." : isBlocked ? "Débloquer" : "Bloquer"}
+              </button>
+            )}
+
+            {/* Relevé button */}
+            <button
+              onClick={() => setShowStatement(true)}
+              className="text-xs px-2.5 py-1.5 rounded-lg font-medium bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-colors"
+            >
+              Relevé
+            </button>
           </div>
           {feedback && (
             <span className={`text-xs ${feedback.ok ? "text-green-400" : "text-red-400"}`}>
