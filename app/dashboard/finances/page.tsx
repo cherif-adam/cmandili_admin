@@ -1,7 +1,8 @@
-﻿export const dynamic = 'force-dynamic'
+export const dynamic = 'force-dynamic'
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import StatsCard from "@/components/StatsCard";
 import FinanceCharts from "@/components/FinanceCharts";
+import ExportButton from "@/components/ExportButton";
 import { TrendingUp, CircleDollarSign, Truck, UtensilsCrossed } from "lucide-react";
 
 async function getCommissionRates() {
@@ -91,11 +92,34 @@ export default async function FinancesPage() {
   const fmt = (n: number) => `${n.toFixed(3)} TND`;
   const pct = (r: number) => `${(r * 100).toFixed(0)}%`;
 
+  // Export: one row per day
+  const exportColumns = [
+    "Date",
+    `Commission restaurants (${pct(rates.restaurantRate)}) (TND)`,
+    `Commission livreurs (${pct(rates.driverRate)}) (TND)`,
+    "Total (TND)",
+  ];
+  const exportRows = data.dailyData.map((d) => [
+    d.date,
+    d["Restaurants (10%)"].toFixed(3),
+    d["Livreurs (23%)"].toFixed(3),
+    d.Total.toFixed(3),
+  ]);
+
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-white">Finances</h2>
-        <p className="text-sm text-gray-400 mt-1">30 derniers jours</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-white">Finances</h2>
+          <p className="text-sm text-gray-400 mt-1">30 derniers jours</p>
+        </div>
+        <ExportButton
+          filename="finances"
+          title="Revenus et commissions"
+          subtitle="30 derniers jours — commandes livrées uniquement"
+          columns={exportColumns}
+          rows={exportRows}
+        />
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -155,4 +179,3 @@ export default async function FinancesPage() {
     </div>
   );
 }
-

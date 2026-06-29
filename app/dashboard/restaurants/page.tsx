@@ -1,7 +1,8 @@
-﻿export const dynamic = 'force-dynamic'
+export const dynamic = 'force-dynamic'
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import StatsCard from "@/components/StatsCard";
 import RestaurantRow from "@/components/RestaurantRow";
+import ExportButton from "@/components/ExportButton";
 import { UtensilsCrossed, CircleDollarSign, TrendingUp } from "lucide-react";
 
 async function getRestaurants() {
@@ -19,7 +20,6 @@ async function getRestaurants() {
 
   const restaurantIds = restaurants.map((r) => r.id);
 
-  // Fetch partners by entity_id (stored as text = restaurant uuid)
   const [{ data: partners }, { data: orders }] = await Promise.all([
     supabaseAdmin
       .from("partners")
@@ -31,7 +31,6 @@ async function getRestaurants() {
       .neq("status", "cancelled"),
   ]);
 
-  // Map partner by entity_id (the restaurant uuid)
   const partnerByRestaurantId: Record<string, { id: string; user_id: string; commission_rate: number | null; is_blocked: boolean }> =
     Object.fromEntries((partners ?? []).map((p) => [p.entity_id, { id: p.id, user_id: p.user_id, commission_rate: p.commission_rate, is_blocked: p.is_blocked ?? false }]));
 
@@ -63,9 +62,31 @@ export default async function RestaurantsPage() {
   const totalCommissions = restaurants.reduce((s, r) => s + r.stats.totalCommissions, 0);
   const ghostCount = restaurants.filter((r) => r.is_ghost_restaurant).length;
 
+  // Export: one row per restaurant
+  const exportColumns = [
+    "Restaurant", "Commandes", "Chiffre d'affaires (TND)",
+    "Commission plateforme (TND)", "Statut", "Ghost",
+  ];
+  const exportRows = restaurants.map((r) => [
+    r.name,
+    String(r.stats.count),
+    r.stats.totalRevenue.toFixed(3),
+    r.stats.totalCommissions.toFixed(3),
+    r.partner?.is_blocked ? "Bloqué" : "Actif",
+    r.is_ghost_restaurant ? "Oui" : "Non",
+  ]);
+
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-white">Restaurants & Partenaires</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-white">Restaurants & Partenaires</h2>
+        <ExportButton
+          filename="restaurants"
+          title="Restaurants & Partenaires"
+          columns={exportColumns}
+          rows={exportRows}
+        />
+      </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatsCard
@@ -75,7 +96,7 @@ export default async function RestaurantsPage() {
           color="purple"
         />
         <StatsCard
-          title="Restaurants fantÃ´mes"
+          title="Restaurants fantômes"
           value={ghostCount}
           icon={UtensilsCrossed}
           color="blue"
@@ -103,7 +124,7 @@ export default async function RestaurantsPage() {
             <thead>
               <tr className="text-left text-xs text-gray-500 border-b border-gray-800">
                 <th className="px-5 py-3 font-medium">Restaurant</th>
-                <th className="px-5 py-3 font-medium">Commandes livrÃ©es</th>
+                <th className="px-5 py-3 font-medium">Commandes livrées</th>
                 <th className="px-5 py-3 font-medium">Chiffre d&apos;affaires</th>
                 <th className="px-5 py-3 font-medium">Commission plateforme</th>
                 <th className="px-5 py-3 font-medium">Solde</th>
@@ -118,7 +139,7 @@ export default async function RestaurantsPage() {
               {!restaurants.length && (
                 <tr>
                   <td colSpan={7} className="px-5 py-8 text-center text-gray-500">
-                    Aucun restaurant trouvÃ©
+                    Aucun restaurant trouvé
                   </td>
                 </tr>
               )}
@@ -129,4 +150,3 @@ export default async function RestaurantsPage() {
     </div>
   );
 }
-
