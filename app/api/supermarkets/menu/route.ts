@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { logAudit, getSessionUser } from "@/lib/audit";
+import { logAudit, requireAdmin } from "@/lib/audit";
 
 export async function GET(req: NextRequest) {
+  if (!(await requireAdmin())) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
   const supermarketId = req.nextUrl.searchParams.get("supermarket_id");
   if (!supermarketId) {
     return NextResponse.json({ error: "Missing supermarket_id" }, { status: 400 });
@@ -19,6 +21,9 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const admin = await requireAdmin();
+  if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
   const body = await req.json();
   const { supermarket_id, name, description, price, category, unit, is_organic } = body;
   if (!supermarket_id || !name || price == null) {
@@ -42,10 +47,9 @@ export async function POST(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const admin = await getSessionUser();
   await logAudit({
-    admin_id: admin?.id ?? null,
-    admin_email: admin?.email ?? "unknown",
+    admin_id: admin.id,
+    admin_email: admin.email ?? "unknown",
     action_type: "add_menu_item",
     target_type: "grocery_item",
     target_id: data.id,
@@ -55,6 +59,9 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PUT(req: NextRequest) {
+  const admin = await requireAdmin();
+  if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
   const body = await req.json();
   const { id, name, description, price, category, unit, is_organic, is_available } = body;
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
@@ -66,10 +73,9 @@ export async function PUT(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const admin = await getSessionUser();
   await logAudit({
-    admin_id: admin?.id ?? null,
-    admin_email: admin?.email ?? "unknown",
+    admin_id: admin.id,
+    admin_email: admin.email ?? "unknown",
     action_type: "update_menu_item",
     target_type: "grocery_item",
     target_id: id,
@@ -79,16 +85,18 @@ export async function PUT(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  const admin = await requireAdmin();
+  if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
   const id = req.nextUrl.searchParams.get("id");
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
   const { error } = await supabaseAdmin.from("grocery_items").delete().eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const admin = await getSessionUser();
   await logAudit({
-    admin_id: admin?.id ?? null,
-    admin_email: admin?.email ?? "unknown",
+    admin_id: admin.id,
+    admin_email: admin.email ?? "unknown",
     action_type: "delete_menu_item",
     target_type: "grocery_item",
     target_id: id,

@@ -62,5 +62,12 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/api/block'],
+  // Protect the dashboard and ALL admin API routes (each uses the service-role
+  // client, which bypasses RLS). `/api/logout` is excluded because it only
+  // clears the caller's own session and must work without an admin check.
+  //
+  // Defense-in-depth: every API route ALSO calls requireAdmin() itself — the
+  // Next docs warn that matcher coverage can be silently lost on refactors, so
+  // the proxy is a backstop, not the sole gate.
+  matcher: ['/dashboard/:path*', '/api/((?!logout).*)'],
 }
