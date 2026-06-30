@@ -6,8 +6,13 @@ import {
   LayoutDashboard,
   Truck,
   UtensilsCrossed,
+  ShoppingCart,
   ShoppingBag,
   BarChart3,
+  Users,
+  Tag,
+  Settings,
+  ClipboardList,
   LogOut,
 } from "lucide-react";
 
@@ -15,8 +20,13 @@ const navItems = [
   { href: "/dashboard", label: "Vue d'ensemble", icon: LayoutDashboard },
   { href: "/dashboard/livreurs", label: "Livreurs", icon: Truck },
   { href: "/dashboard/restaurants", label: "Restaurants", icon: UtensilsCrossed },
+  { href: "/dashboard/supermarkets", label: "Supermarchés", icon: ShoppingCart },
   { href: "/dashboard/commandes", label: "Commandes", icon: ShoppingBag },
+  { href: "/dashboard/clients", label: "Clients", icon: Users },
   { href: "/dashboard/finances", label: "Finances", icon: BarChart3 },
+  { href: "/dashboard/promos", label: "Promotions", icon: Tag },
+  { href: "/dashboard/audit", label: "Journal d'activité", icon: ClipboardList },
+  { href: "/dashboard/parametres", label: "Paramètres", icon: Settings },
 ];
 
 export default function Sidebar() {

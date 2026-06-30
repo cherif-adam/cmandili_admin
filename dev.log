@@ -1,0 +1,15 @@
+
+> admin@0.1.0 dev
+> next dev
+
+▲ Next.js 16.2.9 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.1.120:3000
+- Environments: .env.local
+✓ Ready in 1010ms
+
+ GET /dashboard/restaurants/55b707c4-9ef2-4d42-a0d2-8a134ad5aa9f/menu 200 in 2.8s (next.js: 1672ms, application-code: 1081ms)
+ GET /dashboard/restaurants/55b707c4-9ef2-4d42-a0d2-8a134ad5aa9f/menu 200 in 554ms (next.js: 18ms, application-code: 536ms)
+ GET /dashboard/restaurants/55b707c4-9ef2-4d42-a0d2-8a134ad5aa9f/menu 200 in 718ms (next.js: 23ms, application-code: 695ms)
+ GET /dashboard/restaurants/55b707c4-9ef2-4d42-a0d2-8a134ad5aa9f/menu 200 in 558ms (next.js: 24ms, application-code: 534ms)
+ POST /api/restaurants/menu 200 in 1237ms (next.js: 643ms, application-code: 594ms)

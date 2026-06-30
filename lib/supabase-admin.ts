@@ -2,9 +2,8 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
 // Server-only admin client — bypasses RLS. Never import in client components.
 //
-// The client is created lazily on first use (not at module load time) so that
-// Next.js can bundle this file without throwing "supabaseUrl is required" when
-// the env vars are not present during static build analysis.
+// Lazy singleton: created on first use, not at module load time, so that
+// Next.js static analysis at build time doesn't throw "supabaseUrl is required".
 let _client: SupabaseClient | undefined
 
 function getClient(): SupabaseClient {

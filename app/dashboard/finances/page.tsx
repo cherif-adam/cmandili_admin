@@ -1,8 +1,21 @@
-export const dynamic = 'force-dynamic';
+export const dynamic = 'force-dynamic'
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import StatsCard from "@/components/StatsCard";
 import FinanceCharts from "@/components/FinanceCharts";
+import ExportButton from "@/components/ExportButton";
 import { TrendingUp, CircleDollarSign, Truck, UtensilsCrossed } from "lucide-react";
+
+async function getCommissionRates() {
+  const { data } = await supabaseAdmin
+    .from("global_settings")
+    .select("setting_key, setting_value")
+    .in("setting_key", ["default_restaurant_commission_rate", "default_driver_commission_rate"]);
+  const map = Object.fromEntries((data ?? []).map((r) => [r.setting_key, parseFloat(r.setting_value)]));
+  return {
+    restaurantRate: map["default_restaurant_commission_rate"] ?? 0.10,
+    driverRate: map["default_driver_commission_rate"] ?? 0.23,
+  };
+}
 
 async function getFinanceData() {
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
@@ -11,7 +24,7 @@ async function getFinanceData() {
   const { data: orders } = await supabaseAdmin
     .from("orders")
     .select("platform_fee, driver_fee_cut, created_at, status")
-    .neq("status", "cancelled")
+    .eq("status", "delivered")
     .gte("created_at", thirtyDaysAgo);
 
   const delivered = (orders ?? []);
@@ -75,14 +88,38 @@ async function getFinanceData() {
 }
 
 export default async function FinancesPage() {
-  const data = await getFinanceData();
+  const [data, rates] = await Promise.all([getFinanceData(), getCommissionRates()]);
   const fmt = (n: number) => `${n.toFixed(3)} TND`;
+  const pct = (r: number) => `${(r * 100).toFixed(0)}%`;
+
+  // Export: one row per day
+  const exportColumns = [
+    "Date",
+    `Commission restaurants (${pct(rates.restaurantRate)}) (TND)`,
+    `Commission livreurs (${pct(rates.driverRate)}) (TND)`,
+    "Total (TND)",
+  ];
+  const exportRows = data.dailyData.map((d) => [
+    d.date,
+    d["Restaurants (10%)"].toFixed(3),
+    d["Livreurs (23%)"].toFixed(3),
+    d.Total.toFixed(3),
+  ]);
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-white">Finances</h2>
-        <p className="text-sm text-gray-400 mt-1">30 derniers jours</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-white">Finances</h2>
+          <p className="text-sm text-gray-400 mt-1">30 derniers jours</p>
+        </div>
+        <ExportButton
+          filename="finances"
+          title="Revenus et commissions"
+          subtitle="30 derniers jours — commandes livrées uniquement"
+          columns={exportColumns}
+          rows={exportRows}
+        />
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -101,14 +138,14 @@ export default async function FinancesPage() {
         <StatsCard
           title="Commissions restaurants"
           value={fmt(data.totalRestaurantCommissions)}
-          subtitle="10% du sous-total"
+          subtitle={`${pct(rates.restaurantRate)} du sous-total`}
           icon={UtensilsCrossed}
           color="purple"
         />
         <StatsCard
           title="Commissions livreurs"
           value={fmt(data.totalDriverCommissions)}
-          subtitle="23% des frais livraison"
+          subtitle={`${pct(rates.driverRate)} des frais livraison`}
           icon={Truck}
           color="blue"
         />

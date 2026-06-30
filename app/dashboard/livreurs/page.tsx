@@ -1,7 +1,8 @@
-export const dynamic = 'force-dynamic';
+export const dynamic = 'force-dynamic'
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import DriverRow from "@/components/DriverRow";
 import StatsCard from "@/components/StatsCard";
+import ExportButton from "@/components/ExportButton";
 import { Truck, CircleDollarSign, ShieldX, Wifi } from "lucide-react";
 
 async function getDrivers() {
@@ -73,9 +74,34 @@ export default async function LivreursPage() {
     .filter((d) => (d.wallet?.balance ?? 0) < 0)
     .reduce((s, d) => s + Math.abs(d.wallet?.balance ?? 0), 0);
 
+  // Export: one row per driver
+  const exportColumns = [
+    "Nom", "Téléphone", "Statut", "En ligne",
+    "Livraisons", "Frais collectés (TND)", "Commission due (TND)", "Solde wallet (TND)",
+  ];
+  const exportRows = drivers.map((d) => [
+    d.profile?.full_name ?? "—",
+    d.profile?.phone ?? "—",
+    d.is_blocked ? "Bloqué" : "Actif",
+    d.is_online ? "En ligne" : "Hors ligne",
+    String(d.stats?.count ?? 0),
+    (d.stats?.totalFees ?? 0).toFixed(3),
+    (d.stats?.totalCuts ?? 0).toFixed(3),
+    (d.wallet?.balance ?? 0).toFixed(3),
+  ]);
+
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-white">Livreurs</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-white">Livreurs</h2>
+        <ExportButton
+          filename="livreurs"
+          title="Liste des livreurs"
+          subtitle={`${drivers.length} livreurs — exporté le ${new Date().toLocaleDateString("fr-FR")}`}
+          columns={exportColumns}
+          rows={exportRows}
+        />
+      </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatsCard

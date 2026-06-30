@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
+import { logAudit } from "@/lib/audit";
 
 export async function POST(req: NextRequest) {
-  // Verify the caller is an authenticated admin.
-  // The middleware already checks this for the route, but we add an explicit
-  // server-side check here as defence-in-depth.
   const supabase = await createSupabaseServerClient();
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -23,9 +21,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  // Parse the body — supports both driver blocking and restaurant/partner blocking.
   const body = await req.json();
-  const { driver_id, partner_id, blocked } = body;
+  const { driver_id, partner_id, customer_id, blocked } = body;
 
   if (typeof blocked !== "boolean") {
     return NextResponse.json({ error: "Invalid params" }, { status: 400 });
@@ -38,6 +35,14 @@ export async function POST(req: NextRequest) {
       .eq("id", driver_id);
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    await logAudit({
+      admin_id: user.id,
+      admin_email: user.email ?? "unknown",
+      action_type: blocked ? "block_driver" : "unblock_driver",
+      target_type: "driver",
+      target_id: driver_id,
+    });
     return NextResponse.json({ ok: true });
   }
 
@@ -48,8 +53,34 @@ export async function POST(req: NextRequest) {
       .eq("id", partner_id);
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    await logAudit({
+      admin_id: user.id,
+      admin_email: user.email ?? "unknown",
+      action_type: blocked ? "block_restaurant" : "unblock_restaurant",
+      target_type: "restaurant",
+      target_id: partner_id,
+    });
     return NextResponse.json({ ok: true });
   }
 
-  return NextResponse.json({ error: "Must provide driver_id or partner_id" }, { status: 400 });
+  if (customer_id) {
+    const { error } = await supabaseAdmin
+      .from("profiles")
+      .update({ is_blocked: blocked })
+      .eq("id", customer_id);
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    await logAudit({
+      admin_id: user.id,
+      admin_email: user.email ?? "unknown",
+      action_type: blocked ? "block_customer" : "unblock_customer",
+      target_type: "customer",
+      target_id: customer_id,
+    });
+    return NextResponse.json({ ok: true });
+  }
+
+  return NextResponse.json({ error: "Must provide driver_id, partner_id, or customer_id" }, { status: 400 });
 }

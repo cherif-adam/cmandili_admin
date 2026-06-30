@@ -1,4 +1,4 @@
-export const dynamic = 'force-dynamic';
+﻿export const dynamic = 'force-dynamic'
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import StatsCard from "@/components/StatsCard";
 import RevenueChart from "@/components/RevenueChart";
@@ -10,6 +10,18 @@ import {
   CircleDollarSign,
   Users,
 } from "lucide-react";
+
+async function getCommissionRates() {
+  const { data } = await supabaseAdmin
+    .from("global_settings")
+    .select("setting_key, setting_value")
+    .in("setting_key", ["default_restaurant_commission_rate", "default_driver_commission_rate"]);
+  const map = Object.fromEntries((data ?? []).map((r) => [r.setting_key, parseFloat(r.setting_value)]));
+  return {
+    restaurantRate: map["default_restaurant_commission_rate"] ?? 0.10,
+    driverRate: map["default_driver_commission_rate"] ?? 0.23,
+  };
+}
 
 async function getDashboardStats() {
   const today = new Date();
@@ -85,8 +97,9 @@ async function getDashboardStats() {
 }
 
 export default async function DashboardPage() {
-  const stats = await getDashboardStats();
+  const [stats, rates] = await Promise.all([getDashboardStats(), getCommissionRates()]);
   const fmt = (n: number) => `${n.toFixed(3)} TND`;
+  const pct = (r: number) => `${(r * 100).toFixed(0)}%`;
 
   return (
     <div className="space-y-6">
@@ -106,7 +119,7 @@ export default async function DashboardPage() {
         <StatsCard
           title="Commandes aujourd'hui"
           value={stats.todayOrders}
-          subtitle={`${stats.deliveredToday} livrées`}
+          subtitle={`${stats.deliveredToday} livrÃ©es`}
           icon={ShoppingBag}
           color="blue"
         />
@@ -125,14 +138,14 @@ export default async function DashboardPage() {
         <StatsCard
           title="Commissions restaurants (auj.)"
           value={fmt(stats.todayRestaurantCommissions)}
-          subtitle="10% du sous-total"
+          subtitle={`${pct(rates.restaurantRate)} du sous-total`}
           icon={CircleDollarSign}
           color="orange"
         />
         <StatsCard
           title="Commissions livreurs (auj.)"
           value={fmt(stats.todayDriverCommissions)}
-          subtitle="23% des frais de livraison"
+          subtitle={`${pct(rates.driverRate)} des frais de livraison`}
           icon={Users}
           color="orange"
         />
@@ -153,3 +166,4 @@ export default async function DashboardPage() {
     </div>
   );
 }
+

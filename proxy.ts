@@ -28,8 +28,7 @@ export async function proxy(request: NextRequest) {
     }
   )
 
-  // IMPORTANT: getUser() contacts the Supabase Auth server to verify the token.
-  // Do not use getSession() here — it reads from cookies without verification.
+  // getUser() verifies the token against Supabase Auth server — safer than getSession().
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
@@ -38,7 +37,7 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
 
-  // Verify the is_admin flag using the service-role client so RLS doesn't block.
+  // Verify is_admin via service-role so RLS on profiles doesn't block us.
   const { createClient } = await import('@supabase/supabase-js')
   const adminClient = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -63,5 +62,12 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/api/block'],
+  // Protect the dashboard and ALL admin API routes (each uses the service-role
+  // client, which bypasses RLS). `/api/logout` is excluded because it only
+  // clears the caller's own session and must work without an admin check.
+  //
+  // Defense-in-depth: every API route ALSO calls requireAdmin() itself — the
+  // Next docs warn that matcher coverage can be silently lost on refactors, so
+  // the proxy is a backstop, not the sole gate.
+  matcher: ['/dashboard/:path*', '/api/((?!logout).*)'],
 }

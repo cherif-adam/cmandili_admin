@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
+import { AlertTriangle } from "lucide-react";
 
 interface Order {
   id: string;
@@ -14,6 +15,11 @@ interface Order {
   payment_method: string;
   customer_name: string;
   restaurantName: string;
+  driver_id: string | null;
+  assigned_driver_id: string | null;
+  self_delivery: boolean;
+  cancellation_reason: string | null;
+  cancelled_by: string | null;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -26,6 +32,13 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 const ALL_STATUSES = ["pending", "confirmed", "ready", "picked_up", "delivered", "cancelled"];
+const STUCK_THRESHOLD_MS = 5 * 60 * 1000;
+
+function isStuck(order: Order): boolean {
+  if (!["ready", "confirmed"].includes(order.status)) return false;
+  if (order.driver_id != null) return false;
+  return Date.now() - new Date(order.created_at).getTime() > STUCK_THRESHOLD_MS;
+}
 
 export default function OrdersTable({
   orders,
@@ -46,10 +59,12 @@ export default function OrdersTable({
     router.push(`?${params.toString()}`);
   }
 
+  const stuckCount = orders.filter(isStuck).length;
+
   return (
     <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
       {/* Filter bar */}
-      <div className="px-5 py-3 border-b border-gray-800 flex gap-2 flex-wrap">
+      <div className="px-5 py-3 border-b border-gray-800 flex items-center gap-2 flex-wrap">
         <button
           onClick={() => setStatus(undefined)}
           className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${
@@ -73,6 +88,12 @@ export default function OrdersTable({
             {statusLabels[s] ?? s}
           </button>
         ))}
+        {stuckCount > 0 && (
+          <span className="ml-auto flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-red-500/15 text-red-400 font-medium">
+            <AlertTriangle size={13} />
+            {stuckCount} bloquée{stuckCount > 1 ? "s" : ""} — sans livreur
+          </span>
+        )}
       </div>
 
       <div className="overflow-x-auto">
@@ -93,51 +114,81 @@ export default function OrdersTable({
             </tr>
           </thead>
           <tbody>
-            {orders.map((o) => (
-              <tr
-                key={o.id}
-                className="border-b border-gray-800 hover:bg-gray-800/40 transition-colors"
-              >
-                <td className="px-5 py-3 text-gray-500 font-mono text-xs">
-                  {o.id.slice(0, 8).toUpperCase()}
-                </td>
-                <td className="px-5 py-3 text-gray-400 text-xs whitespace-nowrap">
-                  {new Date(o.created_at).toLocaleDateString("fr-TN", {
-                    day: "2-digit",
-                    month: "2-digit",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </td>
-                <td className="px-5 py-3 text-gray-300">{o.customer_name}</td>
-                <td className="px-5 py-3 text-gray-300">{o.restaurantName}</td>
-                <td className="px-5 py-3">
-                  <span
-                    className={`text-xs px-2 py-1 rounded-full ${STATUS_COLORS[o.status] ?? "bg-gray-700 text-gray-400"}`}
-                  >
-                    {statusLabels[o.status] ?? o.status}
-                  </span>
-                </td>
-                <td className="px-5 py-3 text-gray-300">
-                  {(o.subtotal ?? 0).toFixed(3)}
-                </td>
-                <td className="px-5 py-3 text-gray-300">
-                  {(o.delivery_fee ?? 0).toFixed(3)}
-                </td>
-                <td className="px-5 py-3 text-white font-medium">
-                  {(o.total ?? 0).toFixed(3)}
-                </td>
-                <td className="px-5 py-3 text-orange-400">
-                  {(o.platform_fee ?? 0).toFixed(3)}
-                </td>
-                <td className="px-5 py-3 text-blue-400">
-                  {(o.driver_fee_cut ?? 0).toFixed(3)}
-                </td>
-                <td className="px-5 py-3 text-gray-400 text-xs capitalize">
-                  {o.payment_method ?? "—"}
-                </td>
-              </tr>
-            ))}
+            {orders.map((o) => {
+              const stuck = isStuck(o);
+              return (
+                <tr
+                  key={o.id}
+                  className={`border-b border-gray-800 transition-colors ${
+                    stuck
+                      ? "bg-red-500/5 hover:bg-red-500/10"
+                      : "hover:bg-gray-800/40"
+                  }`}
+                >
+                  <td className="px-5 py-3 text-gray-500 font-mono text-xs">
+                    <div className="flex items-center gap-1.5">
+                      {stuck && (
+                        <AlertTriangle size={12} className="text-red-400 flex-shrink-0" />
+                      )}
+                      {o.id.slice(0, 8).toUpperCase()}
+                    </div>
+                  </td>
+                  <td className="px-5 py-3 text-gray-400 text-xs whitespace-nowrap">
+                    {new Date(o.created_at).toLocaleDateString("fr-TN", {
+                      day: "2-digit",
+                      month: "2-digit",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </td>
+                  <td className="px-5 py-3 text-gray-300">{o.customer_name}</td>
+                  <td className="px-5 py-3 text-gray-300">{o.restaurantName}</td>
+                  <td className="px-5 py-3">
+                    <div className="flex flex-col gap-1">
+                      <span
+                        className={`text-xs px-2 py-1 rounded-full w-fit ${
+                          STATUS_COLORS[o.status] ?? "bg-gray-700 text-gray-400"
+                        }`}
+                      >
+                        {statusLabels[o.status] ?? o.status}
+                      </span>
+                      {o.self_delivery && (
+                        <span className="text-xs px-2 py-0.5 rounded-full w-fit bg-orange-500/15 text-orange-400 font-medium">
+                          Auto-livré
+                        </span>
+                      )}
+                      {stuck && (
+                        <span className="text-xs text-red-400 px-2">Sans livreur</span>
+                      )}
+                      {o.status === "cancelled" && o.cancellation_reason && (
+                        <span className="text-xs text-red-400/70 px-1 mt-0.5" title={o.cancellation_reason}>
+                          {o.cancelled_by === "customer" ? "Client : " : ""}
+                          {o.cancellation_reason}
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-5 py-3 text-gray-300">
+                    {(o.subtotal ?? 0).toFixed(3)}
+                  </td>
+                  <td className="px-5 py-3 text-gray-300">
+                    {(o.delivery_fee ?? 0).toFixed(3)}
+                  </td>
+                  <td className="px-5 py-3 text-white font-medium">
+                    {(o.total ?? 0).toFixed(3)}
+                  </td>
+                  <td className="px-5 py-3 text-orange-400">
+                    {(o.platform_fee ?? 0).toFixed(3)}
+                  </td>
+                  <td className="px-5 py-3 text-blue-400">
+                    {(o.driver_fee_cut ?? 0).toFixed(3)}
+                  </td>
+                  <td className="px-5 py-3 text-gray-400 text-xs capitalize">
+                    {o.payment_method ?? "—"}
+                  </td>
+                </tr>
+              );
+            })}
             {!orders.length && (
               <tr>
                 <td colSpan={11} className="px-5 py-8 text-center text-gray-500">

@@ -2,39 +2,91 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { Ghost, UtensilsCrossed } from "lucide-react";
+import StatementModal from "@/components/StatementModal";
 
 interface RestaurantData {
   id: string;
   name: string;
-  partner: { user_id: string; commission_rate: number | null } | null;
+  is_ghost_restaurant?: boolean;
+  partner: { id: string; user_id: string; commission_rate: number | null; is_blocked: boolean } | null;
   wallet: { balance: number; status: string } | null;
   stats: { count: number; totalRevenue: number; totalCommissions: number };
 }
 
 export default function RestaurantRow({ restaurant: r }: { restaurant: RestaurantData }) {
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
-  const isBlocked = r.wallet?.status === "blocked";
+  const [loading,       setLoading]       = useState(false);
+  const [ghostLoading,  setGhostLoading]  = useState(false);
+  const [isGhost,       setIsGhost]       = useState(r.is_ghost_restaurant ?? false);
+  const [isBlocked,     setIsBlocked]     = useState(r.partner?.is_blocked ?? false);
+  const [feedback,      setFeedback]      = useState<{ ok: boolean; msg: string } | null>(null);
+  const [showStatement, setShowStatement] = useState(false);
 
   async function toggleBlock() {
-    if (!r.partner?.user_id) return;
+    if (!r.partner?.id) return;
     setLoading(true);
-    const newStatus = isBlocked ? "active" : "blocked";
-    await fetch("/api/block", {
+    setFeedback(null);
+    const newBlocked = !isBlocked;
+
+    try {
+      const res = await fetch("/api/block", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ partner_id: r.partner.id, blocked: newBlocked }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Erreur serveur");
+
+      setIsBlocked(newBlocked);
+      setFeedback({ ok: true, msg: newBlocked ? "Restaurant bloqué" : "Restaurant débloqué" });
+      router.refresh();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Erreur inconnue";
+      setFeedback({ ok: false, msg });
+    } finally {
+      setLoading(false);
+      setTimeout(() => setFeedback(null), 3000);
+    }
+  }
+
+  async function toggleGhost() {
+    setGhostLoading(true);
+    const newVal = !isGhost;
+    const res = await fetch("/api/restaurants/toggle-ghost", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user_id: r.partner.user_id, status: newStatus, balance: r.wallet?.balance ?? 0 }),
+      body: JSON.stringify({ restaurant_id: r.id, is_ghost: newVal }),
     });
-    router.refresh();
-    setLoading(false);
+    if (res.ok) setIsGhost(newVal);
+    setGhostLoading(false);
   }
 
   const balance = r.wallet?.balance ?? null;
 
   return (
     <tr className="border-b border-gray-800 hover:bg-gray-800/40 transition-colors">
+      {/* StatementModal renders as position:fixed — visually escapes the table */}
+      {showStatement && (
+        <StatementModal
+          entityType="restaurant"
+          entityId={r.id}
+          entityName={r.name}
+          onClose={() => setShowStatement(false)}
+        />
+      )}
+
       <td className="px-5 py-4">
-        <p className="font-medium text-white">{r.name}</p>
+        <div className="flex items-center gap-2">
+          <p className="font-medium text-white">{r.name}</p>
+          {isGhost && (
+            <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-400 font-medium">
+              <Ghost size={11} />
+              Fantôme
+            </span>
+          )}
+        </div>
         {r.partner?.commission_rate && (
           <p className="text-xs text-gray-500">
             Taux : {(r.partner.commission_rate * 100).toFixed(0)}%
@@ -67,21 +119,63 @@ export default function RestaurantRow({ restaurant: r }: { restaurant: Restauran
         </span>
       </td>
       <td className="px-5 py-4">
-        {r.partner ? (
-          <button
-            onClick={toggleBlock}
-            disabled={loading}
-            className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors disabled:opacity-50 ${
-              isBlocked
-                ? "bg-green-500/20 text-green-400 hover:bg-green-500/30"
-                : "bg-red-500/20 text-red-400 hover:bg-red-500/30"
-            }`}
-          >
-            {loading ? "..." : isBlocked ? "Débloquer" : "Bloquer"}
-          </button>
-        ) : (
-          <span className="text-xs text-gray-600">Pas de partenaire</span>
-        )}
+        <div className="flex flex-col gap-1 items-start">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {/* Ghost toggle */}
+            <button
+              onClick={toggleGhost}
+              disabled={ghostLoading}
+              title={isGhost ? "Désactiver le mode fantôme" : "Activer le mode fantôme"}
+              className={`flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg font-medium transition-colors disabled:opacity-50 ${
+                isGhost
+                  ? "bg-purple-500/20 text-purple-400 hover:bg-purple-500/30"
+                  : "bg-gray-700 text-gray-400 hover:bg-gray-600"
+              }`}
+            >
+              <Ghost size={12} />
+              {ghostLoading ? "..." : isGhost ? "Fantôme ON" : "Fantôme"}
+            </button>
+
+            {/* Menu management — only useful for ghost restaurants */}
+            {isGhost && (
+              <Link
+                href={`/dashboard/restaurants/${r.id}/menu`}
+                className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg font-medium bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-colors"
+              >
+                <UtensilsCrossed size={12} />
+                Menu
+              </Link>
+            )}
+
+            {/* Block/unblock — only if there is a partner account */}
+            {r.partner && (
+              <button
+                onClick={toggleBlock}
+                disabled={loading}
+                className={`text-xs px-2.5 py-1.5 rounded-lg font-medium transition-colors disabled:opacity-50 ${
+                  isBlocked
+                    ? "bg-green-500/20 text-green-400 hover:bg-green-500/30"
+                    : "bg-red-500/20 text-red-400 hover:bg-red-500/30"
+                }`}
+              >
+                {loading ? "..." : isBlocked ? "Débloquer" : "Bloquer"}
+              </button>
+            )}
+
+            {/* Relevé button */}
+            <button
+              onClick={() => setShowStatement(true)}
+              className="text-xs px-2.5 py-1.5 rounded-lg font-medium bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-colors"
+            >
+              Relevé
+            </button>
+          </div>
+          {feedback && (
+            <span className={`text-xs ${feedback.ok ? "text-green-400" : "text-red-400"}`}>
+              {feedback.msg}
+            </span>
+          )}
+        </div>
       </td>
     </tr>
   );
