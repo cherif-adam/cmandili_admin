@@ -3,12 +3,15 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import OrdersTable from "@/components/OrdersTable";
 import ExportButton from "@/components/ExportButton";
 
+// Keys are the EXACT values of the live orders_status_check constraint —
+// the transit statuses are camelCase (pickedUp/onTheWay), not snake_case.
 const STATUS_LABELS: Record<string, string> = {
   pending: "En attente",
   confirmed: "Confirmée",
+  preparing: "En préparation",
   ready: "Prête",
-  picked_up: "Récupérée",
-  on_the_way: "En livraison",
+  pickedUp: "Récupérée",
+  onTheWay: "En livraison",
   delivered: "Livrée",
   cancelled: "Annulée",
 };

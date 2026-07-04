@@ -9,7 +9,7 @@ async function getRestaurants() {
   // restaurants has no partner_id column — the link is partners.entity_id = restaurants.id (text)
   const { data: restaurants, error } = await supabaseAdmin
     .from("restaurants")
-    .select("id, name, is_ghost_restaurant")
+    .select("id, name, is_ghost_restaurant, auto_close_enabled, opening_time, closing_time, categories")
     .order("name");
 
   if (error) {
@@ -23,7 +23,7 @@ async function getRestaurants() {
   const [{ data: partners }, { data: orders }] = await Promise.all([
     supabaseAdmin
       .from("partners")
-      .select("id, user_id, commission_rate, is_blocked, entity_id")
+      .select("id, user_id, commission_rate, is_blocked, entity_id, phone")
       .in("entity_id", restaurantIds),
     supabaseAdmin
       .from("orders")
@@ -31,8 +31,8 @@ async function getRestaurants() {
       .neq("status", "cancelled"),
   ]);
 
-  const partnerByRestaurantId: Record<string, { id: string; user_id: string; commission_rate: number | null; is_blocked: boolean }> =
-    Object.fromEntries((partners ?? []).map((p) => [p.entity_id, { id: p.id, user_id: p.user_id, commission_rate: p.commission_rate, is_blocked: p.is_blocked ?? false }]));
+  const partnerByRestaurantId: Record<string, { id: string; user_id: string; commission_rate: number | null; is_blocked: boolean; phone: string | null }> =
+    Object.fromEntries((partners ?? []).map((p) => [p.entity_id, { id: p.id, user_id: p.user_id, commission_rate: p.commission_rate, is_blocked: p.is_blocked ?? false, phone: p.phone ?? null }]));
 
   const ordersByRestaurant: Record<
     string,
@@ -50,8 +50,14 @@ async function getRestaurants() {
   return restaurants.map((r) => ({
     ...r,
     is_ghost_restaurant: r.is_ghost_restaurant ?? false,
+    categories: r.categories ?? [],
     partner: partnerByRestaurantId[r.id] ?? null,
     stats: ordersByRestaurant[r.id] ?? { count: 0, totalRevenue: 0, totalCommissions: 0 },
+    schedule: {
+      auto_close_enabled: r.auto_close_enabled ?? false,
+      opening_time: r.opening_time ?? null,
+      closing_time: r.closing_time ?? null,
+    },
   }));
 }
 

@@ -3,16 +3,23 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Ghost, UtensilsCrossed } from "lucide-react";
+import { Ghost, UtensilsCrossed, Cake } from "lucide-react";
 import StatementModal from "@/components/StatementModal";
+import ContactActions from "@/components/ContactActions";
+
+// Canonical value shared with the mobile app's home filter chips —
+// must stay byte-identical (accent included).
+const PASTRY_CATEGORY = "Pâtisseries";
 
 interface RestaurantData {
   id: string;
   name: string;
   is_ghost_restaurant?: boolean;
-  partner: { id: string; user_id: string; commission_rate: number | null; is_blocked: boolean } | null;
+  categories?: string[];
+  partner: { id: string; user_id: string; commission_rate: number | null; is_blocked: boolean; phone?: string | null } | null;
   wallet: { balance: number; status: string } | null;
   stats: { count: number; totalRevenue: number; totalCommissions: number };
+  schedule?: { auto_close_enabled: boolean; opening_time: string | null; closing_time: string | null } | null;
 }
 
 export default function RestaurantRow({ restaurant: r }: { restaurant: RestaurantData }) {
@@ -23,6 +30,9 @@ export default function RestaurantRow({ restaurant: r }: { restaurant: Restauran
   const [isBlocked,     setIsBlocked]     = useState(r.partner?.is_blocked ?? false);
   const [feedback,      setFeedback]      = useState<{ ok: boolean; msg: string } | null>(null);
   const [showStatement, setShowStatement] = useState(false);
+  const [pastryLoading, setPastryLoading] = useState(false);
+  const [categories,    setCategories]    = useState<string[]>(r.categories ?? []);
+  const isPastry = categories.includes(PASTRY_CATEGORY);
 
   async function toggleBlock() {
     if (!r.partner?.id) return;
@@ -63,6 +73,20 @@ export default function RestaurantRow({ restaurant: r }: { restaurant: Restauran
     setGhostLoading(false);
   }
 
+  async function togglePastry() {
+    setPastryLoading(true);
+    const next = isPastry
+      ? categories.filter((c) => c !== PASTRY_CATEGORY)
+      : [...categories, PASTRY_CATEGORY];
+    const res = await fetch("/api/restaurants/categories", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ restaurant_id: r.id, categories: next }),
+    });
+    if (res.ok) setCategories(next);
+    setPastryLoading(false);
+  }
+
   const balance = r.wallet?.balance ?? null;
 
   return (
@@ -86,11 +110,35 @@ export default function RestaurantRow({ restaurant: r }: { restaurant: Restauran
               Fantôme
             </span>
           )}
+          {isPastry && (
+            <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-pink-500/15 text-pink-400 font-medium">
+              <Cake size={11} />
+              Pâtisserie
+            </span>
+          )}
         </div>
         {r.partner?.commission_rate && (
           <p className="text-xs text-gray-500">
             Taux : {(r.partner.commission_rate * 100).toFixed(0)}%
           </p>
+        )}
+        {r.partner?.phone && (
+          <p className="text-xs text-gray-500">{r.partner.phone}</p>
+        )}
+        <ContactActions phone={r.partner?.phone} />
+        {(r.schedule?.opening_time || r.schedule?.closing_time || r.schedule?.auto_close_enabled) && (
+          <div className="flex items-center gap-1 mt-1.5">
+            <span className="text-xs text-gray-500">
+              {r.schedule?.opening_time?.slice(0, 5) ?? "--:--"}
+              {" – "}
+              {r.schedule?.closing_time?.slice(0, 5) ?? "--:--"}
+            </span>
+            {r.schedule?.auto_close_enabled && (
+              <span className="text-xs px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400 font-medium">
+                Auto
+              </span>
+            )}
+          </div>
         )}
       </td>
       <td className="px-5 py-4 text-gray-300">{r.stats.count}</td>
@@ -134,6 +182,22 @@ export default function RestaurantRow({ restaurant: r }: { restaurant: Restauran
             >
               <Ghost size={12} />
               {ghostLoading ? "..." : isGhost ? "Fantôme ON" : "Fantôme"}
+            </button>
+
+            {/* Pastry category toggle — tags the venue for the mobile
+                "Pâtisseries" filter chip and card badge */}
+            <button
+              onClick={togglePastry}
+              disabled={pastryLoading}
+              title={isPastry ? "Retirer la catégorie Pâtisseries" : "Marquer comme pâtisserie"}
+              className={`flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg font-medium transition-colors disabled:opacity-50 ${
+                isPastry
+                  ? "bg-pink-500/20 text-pink-400 hover:bg-pink-500/30"
+                  : "bg-gray-700 text-gray-400 hover:bg-gray-600"
+              }`}
+            >
+              <Cake size={12} />
+              {pastryLoading ? "..." : isPastry ? "Pâtisserie ON" : "Pâtisserie"}
             </button>
 
             {/* Menu management — only useful for ghost restaurants */}

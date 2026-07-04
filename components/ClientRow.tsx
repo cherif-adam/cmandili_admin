@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import ContactActions from "@/components/ContactActions";
 
 export interface ClientData {
   id: string;
@@ -55,6 +56,7 @@ export default function ClientRow({ client }: { client: ClientData }) {
       <td className="px-5 py-4">
         <p className="font-medium text-white">{client.full_name || "—"}</p>
         <p className="text-xs text-gray-500">{client.phone || "—"}</p>
+        <ContactActions phone={client.phone} />
       </td>
       <td className="px-5 py-4 text-gray-400 text-xs">{client.email || "—"}</td>
       <td className="px-5 py-4 text-gray-300">{client.stats.orderCount}</td>

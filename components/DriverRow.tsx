@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import StatementModal from "@/components/StatementModal";
+import ContactActions from "@/components/ContactActions";
 
 interface DriverData {
   id: string;
@@ -69,6 +70,7 @@ export default function DriverRow({ driver }: { driver: DriverData }) {
       <td className="px-5 py-4">
         <p className="font-medium text-white">{name}</p>
         <p className="text-xs text-gray-500">{phone}</p>
+        <ContactActions phone={driver.profile?.phone} />
       </td>
       <td className="px-5 py-4">
         <span
