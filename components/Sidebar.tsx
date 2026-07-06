@@ -14,6 +14,7 @@ import {
   Settings,
   ClipboardList,
   LogOut,
+  Gift,
 } from "lucide-react";
 
 const navItems = [
@@ -24,6 +25,7 @@ const navItems = [
   { href: "/dashboard/commandes", label: "Commandes", icon: ShoppingBag },
   { href: "/dashboard/clients", label: "Clients", icon: Users },
   { href: "/dashboard/finances", label: "Finances", icon: BarChart3 },
+  { href: "/dashboard/fidelite", label: "Fidélité", icon: Gift },
   { href: "/dashboard/promos", label: "Promotions", icon: Tag },
   { href: "/dashboard/audit", label: "Journal d'activité", icon: ClipboardList },
   { href: "/dashboard/parametres", label: "Paramètres", icon: Settings },
