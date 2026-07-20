@@ -60,8 +60,10 @@ export default function OrdersTable({
   const [localOrders, setLocalOrders] = useState<Order[]>(initialOrders);
   const [live, setLive] = useState(false);
 
-  // Re-seed when the server re-fetches (filter tab change)
+  // Re-seed when the server re-fetches (filter tab change); localOrders can't
+  // be derived purely from the prop since it also absorbs Realtime events.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLocalOrders(initialOrders);
   }, [initialOrders]);
 
