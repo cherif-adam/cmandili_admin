@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import StatementModal from "@/components/StatementModal";
 import ContactActions from "@/components/ContactActions";
+import TopUpButton from "@/components/TopUpButton";
 
 interface DriverData {
   id: string;
@@ -129,6 +130,11 @@ export default function DriverRow({ driver }: { driver: DriverData }) {
             >
               Relevé
             </button>
+            <TopUpButton
+              driverId={driver.id}
+              entityName={name}
+              currentBalance={balance}
+            />
           </div>
           {feedback && (
             <span className={`text-xs ${feedback.ok ? "text-green-400" : "text-red-400"}`}>

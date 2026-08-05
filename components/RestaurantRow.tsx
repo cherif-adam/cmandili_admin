@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Ghost, UtensilsCrossed, Cake } from "lucide-react";
 import StatementModal from "@/components/StatementModal";
 import ContactActions from "@/components/ContactActions";
+import TopUpButton from "@/components/TopUpButton";
 
 // Canonical value shared with the mobile app's home filter chips —
 // must stay byte-identical (accent included).
@@ -233,6 +234,15 @@ export default function RestaurantRow({ restaurant: r }: { restaurant: Restauran
             >
               Relevé
             </button>
+
+            {/* Prepaid top-up — only if there is a partner account */}
+            {r.partner && (
+              <TopUpButton
+                partnerId={r.partner.id}
+                entityName={r.name}
+                currentBalance={balance}
+              />
+            )}
           </div>
           {feedback && (
             <span className={`text-xs ${feedback.ok ? "text-green-400" : "text-red-400"}`}>

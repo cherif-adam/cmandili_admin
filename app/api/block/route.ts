@@ -29,12 +29,26 @@ export async function POST(req: NextRequest) {
   }
 
   if (driver_id) {
-    const { error } = await supabaseAdmin
+    const { data: driverRow, error } = await supabaseAdmin
       .from("drivers")
       .update({ is_blocked: blocked })
-      .eq("id", driver_id);
+      .eq("id", driver_id)
+      .select("user_id")
+      .single();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    // Mirror the manual (un)block onto the wallet so an automatic prepaid
+    // top-up never silently un-blocks a manually banned account.
+    if (driverRow?.user_id) {
+      await supabaseAdmin
+        .from("wallets")
+        .update({
+          status: blocked ? "blocked" : "active",
+          blocked_reason: blocked ? "manual" : null,
+        })
+        .eq("user_id", driverRow.user_id);
+    }
 
     await logAudit({
       admin_id: user.id,
@@ -47,12 +61,25 @@ export async function POST(req: NextRequest) {
   }
 
   if (partner_id) {
-    const { error } = await supabaseAdmin
+    const { data: partnerRow, error } = await supabaseAdmin
       .from("partners")
       .update({ is_blocked: blocked })
-      .eq("id", partner_id);
+      .eq("id", partner_id)
+      .select("user_id")
+      .single();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    // Mirror the manual (un)block onto the wallet (see driver branch above).
+    if (partnerRow?.user_id) {
+      await supabaseAdmin
+        .from("wallets")
+        .update({
+          status: blocked ? "blocked" : "active",
+          blocked_reason: blocked ? "manual" : null,
+        })
+        .eq("user_id", partnerRow.user_id);
+    }
 
     await logAudit({
       admin_id: user.id,
