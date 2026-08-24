@@ -1,110 +1,90 @@
 export const dynamic = "force-dynamic";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import StatsCard from "@/components/StatsCard";
-import LoyaltyPayoutRow from "@/components/LoyaltyPayoutRow";
-import { Gift, Clock, CircleDollarSign, Scale } from "lucide-react";
+import { Gift, Users, CircleDollarSign, Target } from "lucide-react";
 
-async function getPayouts() {
-  const { data: payouts } = await supabaseAdmin
-    .from("loyalty_driver_payouts")
-    .select("id, order_id, driver_id, milestone_type, amount_owed, status, created_at, settled_at")
+// settlements.user_id is the driver's auth user_id directly (generate_settlements_
+// on_delivery() resolves it from drivers.user_id before inserting) — no drivers
+// join needed, profiles.id matches it directly.
+async function getSubsidySettlements() {
+  const { data: settlements } = await supabaseAdmin
+    .from("settlements")
+    .select("id, user_id, amount, related_order_id, created_at")
+    .eq("type", "loyalty_subsidy")
     .order("created_at", { ascending: false });
 
-  if (!payouts?.length) return [];
+  if (!settlements?.length) return [];
 
-  const driverIds = [...new Set(payouts.map((p) => p.driver_id))];
-  const { data: drivers } = await supabaseAdmin
-    .from("drivers")
-    .select("id, user_id")
-    .in("id", driverIds);
+  const orderIds = [...new Set(settlements.map((s) => s.related_order_id).filter(Boolean))];
+  const { data: orders } = orderIds.length
+    ? await supabaseAdmin.from("orders").select("id, loyalty_milestone_type").in("id", orderIds)
+    : { data: [] };
+  const milestoneByOrder = Object.fromEntries((orders ?? []).map((o) => [o.id, o.loyalty_milestone_type]));
 
-  const userIds = (drivers ?? []).map((d) => d.user_id);
+  const userIds = [...new Set(settlements.map((s) => s.user_id))];
   const { data: profiles } = await supabaseAdmin
     .from("profiles")
     .select("id, full_name, phone")
     .in("id", userIds);
-
   const profileByUserId = Object.fromEntries((profiles ?? []).map((p) => [p.id, p]));
-  const driverById = Object.fromEntries(
-    (drivers ?? []).map((d) => [d.id, profileByUserId[d.user_id] ?? null])
-  );
 
-  return payouts.map((p) => ({
-    id: p.id,
-    milestone_type: p.milestone_type as "half" | "free",
-    amount_owed: Number(p.amount_owed),
-    status: p.status as "pending" | "settled",
-    created_at: p.created_at,
-    settled_at: p.settled_at,
-    driverName: driverById[p.driver_id]?.full_name ?? "—",
-    driverPhone: driverById[p.driver_id]?.phone ?? null,
-    orderShortId: (p.order_id as string).slice(0, 8).toUpperCase(),
+  return settlements.map((s) => ({
+    id: s.id,
+    driverName: profileByUserId[s.user_id]?.full_name ?? "—",
+    driverPhone: profileByUserId[s.user_id]?.phone ?? null,
+    amount: Number(s.amount),
+    milestoneType: (s.related_order_id ? milestoneByOrder[s.related_order_id] : null) as "half" | "free" | null,
+    orderShortId: s.related_order_id ? String(s.related_order_id).slice(0, 8).toUpperCase() : "—",
+    createdAt: s.created_at as string,
   }));
 }
 
-// Per-driver: commission owed to Cmandili (existing mechanism, same query
-// shape as /dashboard/livreurs) minus total loyalty payouts made to them.
-async function getDriverNetSummary() {
-  const { data: drivers } = await supabaseAdmin
-    .from("drivers")
-    .select("id, user_id");
+async function getCustomerProgress() {
+  const { data: progress } = await supabaseAdmin
+    .from("loyalty_customer_progress")
+    .select("customer_id, delivered_count, updated_at")
+    .order("delivered_count", { ascending: false });
 
-  if (!drivers?.length) return [];
+  if (!progress?.length) return [];
 
-  const driverIds = drivers.map((d) => d.id);
-  const userIds = drivers.map((d) => d.user_id);
+  const userIds = progress.map((p) => p.customer_id);
+  const { data: profiles } = await supabaseAdmin
+    .from("profiles")
+    .select("id, full_name, phone")
+    .in("id", userIds);
+  const profileByUserId = Object.fromEntries((profiles ?? []).map((p) => [p.id, p]));
 
-  const [profilesRes, ordersRes, payoutsRes] = await Promise.all([
-    supabaseAdmin.from("profiles").select("id, full_name").in("id", userIds),
-    supabaseAdmin
-      .from("orders")
-      .select("driver_id, driver_fee_cut")
-      .eq("status", "delivered")
-      .in("driver_id", driverIds),
-    supabaseAdmin
-      .from("loyalty_driver_payouts")
-      .select("driver_id, amount_owed, status")
-      .in("driver_id", driverIds),
-  ]);
-
-  const profiles = Object.fromEntries((profilesRes.data ?? []).map((p) => [p.id, p]));
-
-  const commissionByDriver: Record<string, number> = {};
-  for (const o of ordersRes.data ?? []) {
-    if (!o.driver_id) continue;
-    commissionByDriver[o.driver_id] = (commissionByDriver[o.driver_id] ?? 0) + (o.driver_fee_cut ?? 0);
-  }
-
-  const payoutsByDriver: Record<string, { pending: number; settled: number }> = {};
-  for (const p of payoutsRes.data ?? []) {
-    if (!payoutsByDriver[p.driver_id]) payoutsByDriver[p.driver_id] = { pending: 0, settled: 0 };
-    payoutsByDriver[p.driver_id][p.status as "pending" | "settled"] += Number(p.amount_owed);
-  }
-
-  return drivers
-    .map((d) => {
-      const commissionOwed = commissionByDriver[d.id] ?? 0;
-      const loyalty = payoutsByDriver[d.id] ?? { pending: 0, settled: 0 };
-      const loyaltyTotal = loyalty.pending + loyalty.settled;
-      return {
-        id: d.id,
-        name: profiles[d.user_id]?.full_name ?? "—",
-        commissionOwed,
-        loyaltyPending: loyalty.pending,
-        loyaltySettled: loyalty.settled,
-        net: commissionOwed - loyaltyTotal,
-      };
-    })
-    .filter((d) => d.commissionOwed > 0 || d.loyaltyPending > 0 || d.loyaltySettled > 0);
+  return progress.map((p) => {
+    const count = p.delivered_count;
+    // Orders remaining until the next multiple of 5 (every 5th = half-off,
+    // every 10th = free — mirrors apply_loyalty_at_checkout()'s own math).
+    const ordersUntilNext = 5 - (count % 5 === 0 ? 5 : count % 5);
+    const nextCount = count + ordersUntilNext;
+    const nextMilestone: "half" | "free" = nextCount % 10 === 0 ? "free" : "half";
+    return {
+      customerId: p.customer_id as string,
+      name: profileByUserId[p.customer_id]?.full_name ?? "—",
+      phone: profileByUserId[p.customer_id]?.phone ?? null,
+      deliveredCount: count as number,
+      ordersUntilNext,
+      nextMilestone,
+      updatedAt: p.updated_at as string,
+    };
+  });
 }
 
-export default async function FidelitePage() {
-  const [payouts, driverSummary] = await Promise.all([getPayouts(), getDriverNetSummary()]);
+const milestoneLabel: Record<"half" | "free", string> = {
+  half: "-50% livraison",
+  free: "Livraison gratuite",
+};
 
-  const pending = payouts.filter((p) => p.status === "pending");
-  const settled = payouts.filter((p) => p.status === "settled");
-  const totalPending = pending.reduce((s, p) => s + p.amount_owed, 0);
-  const totalSettled = settled.reduce((s, p) => s + p.amount_owed, 0);
+export default async function FidelitePage() {
+  const [subsidies, progress] = await Promise.all([getSubsidySettlements(), getCustomerProgress()]);
+
+  const totalSubsidyAmount = subsidies.reduce((s, p) => s + p.amount, 0);
+  const closeToMilestone = progress.filter((p) => p.ordersUntilNext <= 2).length;
+
+  const fmtDate = (iso: string) => new Date(iso).toLocaleDateString("fr-FR");
 
   return (
     <div className="space-y-6">
@@ -113,28 +93,28 @@ export default async function FidelitePage() {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatsCard title="Paiements en attente" value={pending.length} icon={Clock} color="orange" />
+        <StatsCard title="Subventions versées" value={subsidies.length} icon={Gift} color="green" />
         <StatsCard
-          title="Montant en attente"
-          value={`${totalPending.toFixed(3)} TND`}
+          title="Montant total versé"
+          value={`${totalSubsidyAmount.toFixed(3)} TND`}
           icon={CircleDollarSign}
-          color="red"
-        />
-        <StatsCard title="Paiements réglés" value={settled.length} icon={Gift} color="green" />
-        <StatsCard
-          title="Montant réglé"
-          value={`${totalSettled.toFixed(3)} TND`}
-          icon={Scale}
           color="blue"
+        />
+        <StatsCard title="Clients participants" value={progress.length} icon={Users} color="purple" />
+        <StatsCard
+          title="Proches d'un palier (≤2 commandes)"
+          value={closeToMilestone}
+          icon={Target}
+          color="orange"
         />
       </div>
 
       <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
         <div className="px-5 py-4 border-b border-gray-800">
-          <h3 className="font-semibold text-white">Paiements fidélité en attente</h3>
+          <h3 className="font-semibold text-white">Subventions fidélité versées aux livreurs</h3>
           <p className="text-xs text-gray-400 mt-0.5">
-            Cmandili doit ces montants aux livreurs pour compenser les remises fidélité —
-            à régler manuellement (espèces/virement) puis marquer comme réglé.
+            Créditées automatiquement sur le wallet du livreur à la livraison — aucune action requise
+            (le livreur touche le même net que pour une commande à prix plein).
           </p>
         </div>
         <div className="overflow-x-auto">
@@ -144,19 +124,37 @@ export default async function FidelitePage() {
                 <th className="px-5 py-3 font-medium">Livreur</th>
                 <th className="px-5 py-3 font-medium">Commande</th>
                 <th className="px-5 py-3 font-medium">Palier</th>
-                <th className="px-5 py-3 font-medium">Montant dû</th>
+                <th className="px-5 py-3 font-medium">Montant</th>
                 <th className="px-5 py-3 font-medium">Date</th>
-                <th className="px-5 py-3 font-medium">Statut</th>
               </tr>
             </thead>
             <tbody>
-              {payouts.map((p) => (
-                <LoyaltyPayoutRow key={p.id} payout={p} />
+              {subsidies.map((s) => (
+                <tr key={s.id} className="border-b border-gray-800 hover:bg-gray-800/40 transition-colors">
+                  <td className="px-5 py-4 text-white font-medium">
+                    {s.driverName}
+                    {s.driverPhone && <p className="text-xs text-gray-500">{s.driverPhone}</p>}
+                  </td>
+                  <td className="px-5 py-4 text-gray-300 font-mono text-xs">{s.orderShortId}</td>
+                  <td className="px-5 py-4">
+                    <span
+                      className={`text-xs px-2 py-1 rounded-full font-medium ${
+                        s.milestoneType === "free"
+                          ? "bg-green-500/15 text-green-400"
+                          : "bg-orange-500/15 text-orange-400"
+                      }`}
+                    >
+                      {s.milestoneType ? milestoneLabel[s.milestoneType] : "—"}
+                    </span>
+                  </td>
+                  <td className="px-5 py-4 text-green-400 font-medium">+{s.amount.toFixed(3)} TND</td>
+                  <td className="px-5 py-4 text-gray-400">{fmtDate(s.createdAt)}</td>
+                </tr>
               ))}
-              {!payouts.length && (
+              {!subsidies.length && (
                 <tr>
-                  <td colSpan={6} className="px-5 py-8 text-center text-gray-500">
-                    Aucun paiement fidélité pour le moment
+                  <td colSpan={5} className="px-5 py-8 text-center text-gray-500">
+                    Aucune subvention fidélité pour le moment
                   </td>
                 </tr>
               )}
@@ -167,36 +165,48 @@ export default async function FidelitePage() {
 
       <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
         <div className="px-5 py-4 border-b border-gray-800">
-          <h3 className="font-semibold text-white">Solde net par livreur</h3>
+          <h3 className="font-semibold text-white">Progression fidélité par client</h3>
           <p className="text-xs text-gray-400 mt-0.5">
-            Commission due à Cmandili (23% des frais de livraison) moins les paiements fidélité
-            (en attente + réglés) versés à ce livreur.
+            Compteur à vie des commandes livrées — palier -50% tous les 5, gratuit tous les 10.
           </p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-xs text-gray-500 border-b border-gray-800">
-                <th className="px-5 py-3 font-medium">Livreur</th>
-                <th className="px-5 py-3 font-medium">Commission due</th>
-                <th className="px-5 py-3 font-medium">Fidélité en attente</th>
-                <th className="px-5 py-3 font-medium">Fidélité réglée</th>
-                <th className="px-5 py-3 font-medium">Net</th>
+                <th className="px-5 py-3 font-medium">Client</th>
+                <th className="px-5 py-3 font-medium">Commandes livrées</th>
+                <th className="px-5 py-3 font-medium">Prochain palier</th>
+                <th className="px-5 py-3 font-medium">Commandes restantes</th>
+                <th className="px-5 py-3 font-medium">Dernière mise à jour</th>
               </tr>
             </thead>
             <tbody>
-              {driverSummary.map((d) => (
-                <tr key={d.id} className="border-b border-gray-800 hover:bg-gray-800/40 transition-colors">
-                  <td className="px-5 py-4 text-white font-medium">{d.name}</td>
-                  <td className="px-5 py-4 text-gray-300">{d.commissionOwed.toFixed(3)} TND</td>
-                  <td className="px-5 py-4 text-orange-400">{d.loyaltyPending.toFixed(3)} TND</td>
-                  <td className="px-5 py-4 text-gray-400">{d.loyaltySettled.toFixed(3)} TND</td>
-                  <td className={`px-5 py-4 font-medium ${d.net < 0 ? "text-red-400" : "text-green-400"}`}>
-                    {d.net.toFixed(3)} TND
+              {progress.map((p) => (
+                <tr key={p.customerId} className="border-b border-gray-800 hover:bg-gray-800/40 transition-colors">
+                  <td className="px-5 py-4 text-white font-medium">
+                    {p.name}
+                    {p.phone && <p className="text-xs text-gray-500">{p.phone}</p>}
                   </td>
+                  <td className="px-5 py-4 text-gray-300">{p.deliveredCount}</td>
+                  <td className="px-5 py-4">
+                    <span
+                      className={`text-xs px-2 py-1 rounded-full font-medium ${
+                        p.nextMilestone === "free"
+                          ? "bg-green-500/15 text-green-400"
+                          : "bg-orange-500/15 text-orange-400"
+                      }`}
+                    >
+                      {milestoneLabel[p.nextMilestone]}
+                    </span>
+                  </td>
+                  <td className={`px-5 py-4 font-medium ${p.ordersUntilNext <= 2 ? "text-orange-400" : "text-gray-400"}`}>
+                    {p.ordersUntilNext}
+                  </td>
+                  <td className="px-5 py-4 text-gray-400">{fmtDate(p.updatedAt)}</td>
                 </tr>
               ))}
-              {!driverSummary.length && (
+              {!progress.length && (
                 <tr>
                   <td colSpan={5} className="px-5 py-8 text-center text-gray-500">
                     Aucune donnée
