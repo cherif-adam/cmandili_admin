@@ -31,6 +31,14 @@ async function getRestaurants() {
       .neq("status", "cancelled"),
   ]);
 
+  const partnerUserIds = (partners ?? []).map((p) => p.user_id);
+  const { data: wallets } = partnerUserIds.length
+    ? await supabaseAdmin.from("wallets").select("user_id, balance, status").in("user_id", partnerUserIds)
+    : { data: [] };
+  const walletByUserId: Record<string, { balance: number; status: string }> = Object.fromEntries(
+    (wallets ?? []).map((w) => [w.user_id, { balance: Number(w.balance), status: w.status }])
+  );
+
   const partnerByRestaurantId: Record<string, { id: string; user_id: string; commission_rate: number | null; is_blocked: boolean; phone: string | null }> =
     Object.fromEntries((partners ?? []).map((p) => [p.entity_id, { id: p.id, user_id: p.user_id, commission_rate: p.commission_rate, is_blocked: p.is_blocked ?? false, phone: p.phone ?? null }]));
 
@@ -47,18 +55,22 @@ async function getRestaurants() {
     ordersByRestaurant[o.restaurant_id].totalCommissions += Number(o.platform_fee) ?? 0;
   }
 
-  return restaurants.map((r) => ({
-    ...r,
-    is_ghost_restaurant: r.is_ghost_restaurant ?? false,
-    categories: r.categories ?? [],
-    partner: partnerByRestaurantId[r.id] ?? null,
-    stats: ordersByRestaurant[r.id] ?? { count: 0, totalRevenue: 0, totalCommissions: 0 },
-    schedule: {
-      auto_close_enabled: r.auto_close_enabled ?? false,
-      opening_time: r.opening_time ?? null,
-      closing_time: r.closing_time ?? null,
-    },
-  }));
+  return restaurants.map((r) => {
+    const partner = partnerByRestaurantId[r.id] ?? null;
+    return {
+      ...r,
+      is_ghost_restaurant: r.is_ghost_restaurant ?? false,
+      categories: r.categories ?? [],
+      partner,
+      wallet: partner ? walletByUserId[partner.user_id] ?? null : null,
+      stats: ordersByRestaurant[r.id] ?? { count: 0, totalRevenue: 0, totalCommissions: 0 },
+      schedule: {
+        auto_close_enabled: r.auto_close_enabled ?? false,
+        opening_time: r.opening_time ?? null,
+        closing_time: r.closing_time ?? null,
+      },
+    };
+  });
 }
 
 export default async function RestaurantsPage() {
@@ -140,7 +152,7 @@ export default async function RestaurantsPage() {
             </thead>
             <tbody>
               {restaurants.map((r) => (
-                <RestaurantRow key={r.id} restaurant={{ ...r, wallet: null }} />
+                <RestaurantRow key={r.id} restaurant={r} />
               ))}
               {!restaurants.length && (
                 <tr>
