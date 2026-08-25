@@ -1,17 +1,6 @@
-// POST /api/releve
-// This route is NOT in the proxy middleware matcher, so we verify admin auth explicitly.
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { createSupabaseServerClient } from "@/lib/supabase-server";
-
-async function requireAdmin() {
-  const supabase = await createSupabaseServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
-  const { data: profile } = await supabaseAdmin
-    .from("profiles").select("is_admin").eq("id", user.id).single();
-  return profile?.is_admin ? user : null;
-}
+import { requireAdmin } from "@/lib/audit";
 
 function generateReferenceCode(): string {
   const date = new Date().toISOString().slice(0, 10).replace(/-/g, "");

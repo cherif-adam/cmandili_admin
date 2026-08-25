@@ -1,17 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { createSupabaseServerClient } from "@/lib/supabase-server";
-import { logAudit } from "@/lib/audit";
-import type { User } from "@supabase/supabase-js";
-
-async function requireAdmin(): Promise<User | null> {
-  const supabase = await createSupabaseServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
-  const { data: profile } = await supabaseAdmin
-    .from("profiles").select("is_admin").eq("id", user.id).single();
-  return profile?.is_admin ? user : null;
-}
+import { logAudit, requireAdmin } from "@/lib/audit";
 
 // POST — create a new promo code
 export async function POST(req: NextRequest) {
