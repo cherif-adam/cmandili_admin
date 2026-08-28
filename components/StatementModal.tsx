@@ -98,7 +98,7 @@ export default function StatementModal({
     doc.setFontSize(11);
     doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold");
-    doc.text("Cmandili  —  Relevé officiel", 14, 7);
+    doc.text("Amana  —  Relevé officiel", 14, 7);
 
     // Title
     doc.setTextColor(30);
@@ -180,7 +180,7 @@ export default function StatementModal({
       doc.setTextColor(150);
       const pH = doc.internal.pageSize.getHeight();
       doc.text(
-        "Document généré automatiquement par la plateforme Cmandili. Ce relevé fait foi entre les parties.",
+        "Document généré automatiquement par la plateforme Amana. Ce relevé fait foi entre les parties.",
         14, pH - 8
       );
       doc.text(`Page ${i}/${pageCount}`, pageW - 14, pH - 8, { align: "right" });

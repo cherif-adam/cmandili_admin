@@ -35,7 +35,7 @@ export default function ExportButton({ filename, title, subtitle, columns, rows 
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `cmandili_${filename}_${dateFile}.csv`;
+    a.download = `amana_${filename}_${dateFile}.csv`;
     a.click();
     URL.revokeObjectURL(url);
     setOpen(false);
@@ -62,7 +62,7 @@ export default function ExportButton({ filename, title, subtitle, columns, rows 
     doc.setFontSize(11);
     doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold");
-    doc.text("Cmandili  —  Administration", 14, 7);
+    doc.text("Amana  —  Administration", 14, 7);
 
     doc.setTextColor(30, 30, 30);
     doc.setFontSize(14);
@@ -106,7 +106,7 @@ export default function ExportButton({ filename, title, subtitle, columns, rows 
       );
     }
 
-    doc.save(`cmandili_${filename}_${dateFile}.pdf`);
+    doc.save(`amana_${filename}_${dateFile}.pdf`);
     setOpen(false);
   }
 

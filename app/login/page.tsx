@@ -138,7 +138,7 @@ function LoginForm() {
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   autoComplete="email"
-                  placeholder="admin@cmandili.tn"
+                  placeholder="admin@amana.tn"
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-9 pr-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 transition-colors"
                 />
               </div>
@@ -184,7 +184,7 @@ function LoginForm() {
             onChange={(e) => setEmail(e.target.value)}
             required
             autoComplete="email"
-            placeholder="admin@cmandili.tn"
+            placeholder="admin@amana.tn"
             className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-9 pr-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 transition-colors"
           />
         </div>
@@ -236,7 +236,7 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gray-950 flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-white">Cmandili</h1>
+          <h1 className="text-2xl font-bold text-white">Amana</h1>
           <p className="text-gray-400 mt-1 text-sm">Panneau d'administration</p>
         </div>
         <Suspense fallback={<div className="h-48 bg-gray-900 rounded-xl animate-pulse" />}>

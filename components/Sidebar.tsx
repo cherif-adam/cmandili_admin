@@ -46,7 +46,7 @@ export default function Sidebar() {
   return (
     <aside className="w-60 flex-shrink-0 bg-gray-900 border-r border-gray-800 flex flex-col">
       <div className="px-6 py-5 border-b border-gray-800">
-        <h1 className="text-lg font-bold text-white">Cmandili</h1>
+        <h1 className="text-lg font-bold text-white">Amana</h1>
         <p className="text-xs text-gray-400 mt-0.5">Administration</p>
       </div>
       <nav className="flex-1 px-3 py-4 space-y-1">

@@ -62,7 +62,7 @@ export default async function RelevePage({
         <div className="bg-orange-500 px-8 py-5 flex items-center justify-between">
           <div>
             <p className="text-white/70 text-xs font-semibold uppercase tracking-widest">
-              Cmandili
+              Amana
             </p>
             <h1 className="text-white text-2xl font-bold mt-0.5">Relevé officiel</h1>
           </div>
@@ -195,7 +195,7 @@ export default async function RelevePage({
         <div className="px-8 py-4 bg-gray-50 border-t border-gray-100 text-center">
           <p className="text-xs text-gray-400">
             Ce document est généré automatiquement par la plateforme{" "}
-            <strong className="text-orange-500">Cmandili</strong> et fait foi entre
+            <strong className="text-orange-500">Amana</strong> et fait foi entre
             les parties pour la période indiquée.
           </p>
           <p className="text-xs text-gray-300 mt-1">Réf : {stmt.reference_code}</p>

@@ -5,8 +5,8 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Cmandili Admin",
-  description: "Tableau de bord administrateur Cmandili",
+  title: "Amana Admin",
+  description: "Tableau de bord administrateur Amana",
 };
 
 export default function RootLayout({

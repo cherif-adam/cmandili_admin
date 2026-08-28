@@ -69,7 +69,7 @@ export default function ResetPasswordPage() {
     <div className="min-h-screen bg-gray-950 flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-white">Cmandili</h1>
+          <h1 className="text-2xl font-bold text-white">Amana</h1>
           <p className="text-gray-400 mt-1 text-sm">Nouveau mot de passe</p>
         </div>
 
