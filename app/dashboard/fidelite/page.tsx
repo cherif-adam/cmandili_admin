@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import StatsCard from "@/components/StatsCard";
 import { Gift, Users, CircleDollarSign, Target } from "lucide-react";
+import PageHeader from "@/components/PageHeader";
 
 // settlements.user_id is the driver's auth user_id directly (generate_settlements_
 // on_delivery() resolves it from drivers.user_id before inserting) — no drivers
@@ -87,9 +88,9 @@ export default async function FidelitePage() {
   const fmtDate = (iso: string) => new Date(iso).toLocaleDateString("fr-FR");
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-white">Programme fidélité</h2>
+        <PageHeader icon={Gift} title={"Programme fidélité"} />
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

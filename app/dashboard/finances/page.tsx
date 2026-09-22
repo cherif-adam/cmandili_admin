@@ -3,7 +3,14 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import StatsCard from "@/components/StatsCard";
 import FinanceCharts from "@/components/FinanceCharts";
 import ExportButton from "@/components/ExportButton";
-import { TrendingUp, CircleDollarSign, Truck, UtensilsCrossed } from "lucide-react";
+import {
+  TrendingUp,
+  CircleDollarSign,
+  Truck,
+  UtensilsCrossed,
+  BarChart3,
+} from "lucide-react";
+import PageHeader from "@/components/PageHeader";
 
 async function getCommissionRates() {
   const { data } = await supabaseAdmin
@@ -107,12 +114,9 @@ export default async function FinancesPage() {
   ]);
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-white">Finances</h2>
-          <p className="text-sm text-gray-400 mt-1">30 derniers jours</p>
-        </div>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-2">
+        <PageHeader icon={BarChart3} title={"Finances"} subtitle={<>30 derniers jours</>} />
         <ExportButton
           filename="finances"
           title="Revenus et commissions"

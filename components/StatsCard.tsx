@@ -8,12 +8,16 @@ interface StatsCardProps {
   color?: "orange" | "blue" | "green" | "red" | "purple";
 }
 
-const colorMap = {
-  orange: "text-orange-400 bg-orange-500/10",
-  blue: "text-blue-400 bg-blue-500/10",
-  green: "text-green-400 bg-green-500/10",
-  red: "text-red-400 bg-red-500/10",
-  purple: "text-purple-400 bg-purple-500/10",
+/**
+ * Compact KPI tile. The previous version used a 2xl number and heavy padding,
+ * which made four of them eat a third of the screen before any actual data.
+ */
+const accent = {
+  orange: "#f59e0b",
+  blue: "#3b82f6",
+  green: "#10b981",
+  red: "#ef4444",
+  purple: "#8b5cf6",
 };
 
 export default function StatsCard({
@@ -23,18 +27,28 @@ export default function StatsCard({
   icon: Icon,
   color = "orange",
 }: StatsCardProps) {
-  const colorClass = colorMap[color];
+  const c = accent[color];
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-sm text-gray-400">{title}</p>
-          <p className="text-2xl font-bold text-white mt-1">{value}</p>
-          {subtitle && <p className="text-xs text-gray-500 mt-1">{subtitle}</p>}
-        </div>
-        <div className={`p-2.5 rounded-lg ${colorClass}`}>
-          <Icon size={20} />
-        </div>
+    <div
+      className="flex items-center gap-3 rounded-lg p-3"
+      style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
+    >
+      <div
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
+        style={{ background: `${c}1a`, color: c }}
+      >
+        <Icon size={16} />
+      </div>
+      <div className="min-w-0">
+        <p className="truncate text-[11px]" style={{ color: "var(--text-muted)" }}>
+          {title}
+        </p>
+        <p className="tabular text-lg font-semibold leading-tight">{value}</p>
+        {subtitle && (
+          <p className="truncate text-[10px]" style={{ color: "var(--text-faint)" }}>
+            {subtitle}
+          </p>
+        )}
       </div>
     </div>
   );

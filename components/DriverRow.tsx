@@ -93,6 +93,14 @@ export default function DriverRow({ driver }: { driver: DriverData }) {
       </td>
       <td className="px-5 py-4 text-orange-400 font-medium">
         {driver.stats.totalCuts.toFixed(3)} TND
+        {driver.stats.totalCuts > driver.stats.totalFees && (
+          <span
+            className="ml-1 cursor-help"
+            title="Commission supérieure aux frais collectés : ces commandes ont été facturées sous un ancien taux. Le déclencheur en base n'est pas rétroactif."
+          >
+            ⚠
+          </span>
+        )}
       </td>
       <td className="px-5 py-4">
         <span className={balance < 0 ? "text-red-400 font-medium" : "text-gray-300"}>

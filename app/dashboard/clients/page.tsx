@@ -4,6 +4,7 @@ import StatsCard from "@/components/StatsCard";
 import ClientsTable from "@/components/ClientsTable";
 import { ClientData } from "@/components/ClientRow";
 import { Users, ShieldX, ShoppingBag } from "lucide-react";
+import PageHeader from "@/components/PageHeader";
 
 async function getClients(): Promise<ClientData[]> {
   // 1. Fetch all non-admin profiles
@@ -67,6 +68,17 @@ async function getClients(): Promise<ClientData[]> {
     }
   }
 
+  // 5. Prepaid wallet balances, so the admin can see what a client already
+  //    has before crediting more. A customer with no wallet row has never
+  //    been credited; that reads as 0.
+  const { data: wallets } = await supabaseAdmin
+    .from("wallets")
+    .select("user_id, balance")
+    .in("user_id", customerIds);
+  const balanceByUser: Record<string, number> = Object.fromEntries(
+    (wallets ?? []).map((w) => [w.user_id, Number(w.balance)])
+  );
+
   return customerProfiles.map((p) => ({
     id: p.id,
     full_name: p.full_name,
@@ -74,6 +86,7 @@ async function getClients(): Promise<ClientData[]> {
     email: emailById[p.id] ?? null,
     is_blocked: p.is_blocked ?? false,
     created_at: p.created_at,
+    balance: balanceByUser[p.id] ?? 0,
     stats: statsByUser[p.id] ?? { orderCount: 0, totalSpent: 0 },
   }));
 }
@@ -86,11 +99,8 @@ export default async function ClientsPage() {
   const totalOrders = clients.reduce((s, c) => s + c.stats.orderCount, 0);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-white">Clients</h2>
-        <p className="text-sm text-gray-400 mt-1">Comptes clients de la plateforme</p>
-      </div>
+    <div className="space-y-4">
+      <PageHeader icon={Users} title={"Clients"} subtitle={<>Comptes clients de la plateforme</>} />
 
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
         <StatsCard

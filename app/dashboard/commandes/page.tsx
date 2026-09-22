@@ -2,6 +2,8 @@ export const dynamic = 'force-dynamic'
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import OrdersTable from "@/components/OrdersTable";
 import ExportButton from "@/components/ExportButton";
+import PageHeader from "@/components/PageHeader";
+import { ShoppingBag } from "lucide-react";
 
 // Keys are the EXACT values of the live orders_status_check constraint —
 // the transit statuses are camelCase (pickedUp/onTheWay), not snake_case.
@@ -90,9 +92,9 @@ export default async function CommandesPage({
   ].filter(Boolean).join("  ·  ") || "Toutes les commandes (200 dernières)";
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-white">Commandes</h2>
+        <PageHeader icon={ShoppingBag} title={"Commandes"} />
         <div className="flex items-center gap-2 text-sm text-gray-400">
           <span className="bg-gray-800 px-3 py-1.5 rounded-lg">
             {totalOrders} commandes

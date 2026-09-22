@@ -1,13 +1,235 @@
 @import "tailwindcss";
 
+/* ── Theme tokens ───────────────────────────────────────────────────────────
+   Light is the default, matching the three mobile apps (their AppColors use
+   background #F8F9FA on white surfaces). The dashboard was dark-only and
+   orange, which matched none of them.
+
+   Every colour is a token so the whole dashboard flips with one attribute on
+   <html>; nothing hardcodes a gray-900 that would survive the switch. */
 :root {
-  --background: #030712;
-  --foreground: #f9fafb;
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --surface-2: #f1f3f5;
+  --border: #e4e7eb;
+  --border-strong: #d4d9e0;
+  --text: #2d3436;
+  --text-muted: #636e72;
+  --text-faint: #9aa4ad;
+  /* Client app's primary green — the customer-facing brand. */
+  --brand: #059669;
+  --brand-soft: rgba(5, 150, 105, 0.1);
+  --brand-text: #047857;
+  --shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.1);
 }
 
+:root[data-theme="dark"] {
+  --bg: #0f1115;
+  --surface: #171a21;
+  --surface-2: #1e222b;
+  --border: #272c37;
+  --border-strong: #333a48;
+  --text: #e8eaed;
+  --text-muted: #9aa4b2;
+  --text-faint: #6b7480;
+  --brand: #10b981;
+  --brand-soft: rgba(16, 185, 129, 0.14);
+  --brand-text: #34d399;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.4);
+}
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  /* The root layout loads Inter via next/font; hardcoding Arial here silently
+     overrode it on every page. */
+  font-family: inherit;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Smaller base than the browser default: the dashboard is dense, and 16px
+     made every table and card feel oversized. */
+  font-size: 14px;
+}
+
+/* ── Semantic utilities ─────────────────────────────────────────────────── */
+.surface {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.text-muted {
+  color: var(--text-muted);
+}
+.text-faint {
+  color: var(--text-faint);
+}
+.brand {
+  color: var(--brand-text);
+}
+
+/* Money columns: proportional digits make a column of TND amounts jitter. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Tables ─────────────────────────────────────────────────────────────── */
+.tbl {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.tbl thead th {
+  text-align: left;
+  font-weight: 500;
+  color: var(--text-muted);
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.tbl tbody td {
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.tbl tbody tr:last-child td {
+  border-bottom: 0;
+}
+.tbl tbody tr:hover {
+  background: var(--surface-2);
+}
+
+/* ── Scrollbars ─────────────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 6px;
+  border: 2px solid var(--bg);
+}
+
+/* ── Google Maps info windows ───────────────────────────────────────────── */
+.gm-style .gm-style-iw-c {
+  background: var(--surface) !important;
+  border-radius: 10px !important;
+  box-shadow: var(--shadow) !important;
+  padding: 10px !important;
+}
+.gm-style .gm-style-iw-d {
+  overflow: hidden !important;
+  background: transparent !important;
+}
+.gm-style .gm-style-iw-tc::after {
+  background: var(--surface) !important;
+}
+
+/* ── Legacy dark-only classes, remapped to theme tokens ─────────────────────
+   The dashboard was written dark-only: 31 files hardcode `bg-gray-900`,
+   `text-white`, `border-gray-800` and friends. Rewriting each one by hand
+   would be a large, error-prone diff for no behaviour change.
+
+   Instead these utilities are redefined in terms of the theme tokens, so
+   every existing page follows the light/dark switch with no edit. New code
+   should use the tokens (--surface, --text, …) or the .surface/.tbl helpers
+   directly; this block exists to carry the old markup across.
+
+   Tailwind v4 emits utilities into the `utilities` layer, so an unlayered
+   rule here wins regardless of source order. */
+.bg-gray-950 { background-color: var(--bg) !important; }
+.bg-gray-900 { background-color: var(--surface) !important; }
+.bg-gray-800 { background-color: var(--surface-2) !important; }
+.bg-gray-700 { background-color: var(--border) !important; }
+.bg-gray-600 { background-color: var(--border-strong) !important; }
+
+.border-gray-950,
+.border-gray-900,
+.border-gray-800 { border-color: var(--border) !important; }
+.border-gray-700 { border-color: var(--border-strong) !important; }
+
+.text-white   { color: var(--text) !important; }
+.text-gray-100,
+.text-gray-200,
+.text-gray-300 { color: var(--text) !important; }
+.text-gray-400 { color: var(--text-muted) !important; }
+.text-gray-500,
+.text-gray-600 { color: var(--text-faint) !important; }
+
+/* Hover states written against the dark palette. */
+.hover\:bg-gray-800:hover { background-color: var(--surface-2) !important; }
+.hover\:bg-gray-700:hover { background-color: var(--border) !important; }
+.hover\:text-white:hover  { color: var(--text) !important; }
+
+/* Semi-transparent panel backgrounds used on a few pages. */
+.bg-gray-800\/40,
+.bg-gray-800\/50,
+.bg-gray-800\/60 { background-color: var(--surface-2) !important; }
+.bg-gray-900\/60 { background-color: var(--surface) !important; }
+
+/* `text-gray-900` is used for text ON a coloured chip, where the intent is
+   "dark text on a light fill" — it must stay dark in both themes. */
+.text-gray-900 { color: #111827 !important; }
+
+/* The active filter chip on the Boutiques page fills white with dark text —
+   an inversion that must stay inverted in both themes. Scoped to that exact
+   pairing: a bare `.bg-white` is also used for toggle-switch knobs and the
+   printable statement page, which must stay genuinely white. */
+.bg-white.text-gray-900 {
+  background-color: var(--text) !important;
+  color: var(--surface) !important;
+}
+
+/* ── Responsive safety net ──────────────────────────────────────────────────
+   A single wide table or long unbroken string used to push the whole page
+   sideways on a phone, leaving the layout scrolled off-centre with no way
+   back. Clamping at the root means the overflow happens inside the table's
+   own scroll container, where it belongs. */
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* Tables stay legible rather than wrapping into unreadable columns; the
+   wrapper scrolls instead. */
+.tbl {
+  min-width: 520px;
+}
+
+@media (max-width: 640px) {
+  /* Tighter cells so more of a row fits before scrolling starts. */
+  .tbl thead th,
+  .tbl tbody td {
+    padding: 9px 10px;
+  }
+  /* Long emails and shop names would otherwise force a very wide table. */
+  .tbl td {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+/* Modals: full-height sheets on a phone scroll, rather than clipping their
+   submit button off the bottom of the screen. */
+@media (max-width: 640px) {
+  .fixed.inset-0 > div {
+    max-height: 92vh;
+    overflow-y: auto;
+  }
+}
+
+/* Touch targets: 15px icon buttons are fine with a mouse, marginal with a
+   finger. Give interactive controls a comfortable minimum on touch devices. */
+@media (pointer: coarse) {
+  button,
+  a[role="button"],
+  select {
+    min-height: 34px;
+  }
 }

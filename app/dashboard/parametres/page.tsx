@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic'
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import SettingsForm from "./SettingsForm";
 import { Settings } from "lucide-react";
+import PageHeader from "@/components/PageHeader";
 
 async function getCommissionRates() {
   const { data } = await supabaseAdmin
@@ -20,13 +21,13 @@ export default async function ParametresPage() {
   const { restaurantRate, driverRate } = await getCommissionRates();
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex items-center gap-3">
-        <Settings size={22} className="text-orange-400" />
-        <div>
-          <h2 className="text-2xl font-bold text-white">Paramètres</h2>
-          <p className="text-sm text-gray-400 mt-0.5">Taux de commission de la plateforme</p>
-        </div>
+        <PageHeader
+          icon={Settings}
+          title="Paramètres"
+          subtitle="Taux de commission de la plateforme"
+        />
       </div>
 
       <SettingsForm restaurantRate={restaurantRate} driverRate={driverRate} />

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import TopUpButton from "@/components/TopUpButton";
 import ContactActions from "@/components/ContactActions";
 
 export interface ClientData {
@@ -11,6 +12,8 @@ export interface ClientData {
   email: string | null;
   is_blocked: boolean;
   created_at: string;
+  /** Prepaid wallet balance in TND. 0 when never credited. */
+  balance: number;
   stats: { orderCount: number; totalSpent: number };
 }
 
@@ -62,6 +65,11 @@ export default function ClientRow({ client }: { client: ClientData }) {
       <td className="px-5 py-4 text-gray-300">{client.stats.orderCount}</td>
       <td className="px-5 py-4 text-gray-300">{client.stats.totalSpent.toFixed(3)} TND</td>
       <td className="px-5 py-4">
+        <span className={client.balance > 0 ? "text-emerald-400 font-medium" : "text-gray-500"}>
+          {client.balance.toFixed(3)} TND
+        </span>
+      </td>
+      <td className="px-5 py-4">
         <span
           className={`text-xs px-2 py-1 rounded-full ${
             isBlocked ? "bg-red-500/15 text-red-400" : "bg-green-500/15 text-green-400"
@@ -84,6 +92,11 @@ export default function ClientRow({ client }: { client: ClientData }) {
           >
             {loading ? "..." : isBlocked ? "Débloquer" : "Bloquer"}
           </button>
+          <TopUpButton
+            clientId={client.id}
+            entityName={client.full_name || client.email || "Client"}
+            currentBalance={client.balance}
+          />
           {feedback && (
             <span className={`text-xs ${feedback.ok ? "text-green-400" : "text-red-400"}`}>
               {feedback.msg}

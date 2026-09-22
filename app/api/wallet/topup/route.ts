@@ -13,25 +13,38 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const { driver_id, partner_id, amount } = await req.json();
+  const { driver_id, partner_id, client_id, amount } = await req.json();
 
   const value = Number(amount);
   if (!Number.isFinite(value) || value <= 0 || value > 100000) {
     return NextResponse.json({ error: "Montant invalide" }, { status: 400 });
   }
-  if (!driver_id && !partner_id) {
+  if (!driver_id && !partner_id && !client_id) {
     return NextResponse.json(
-      { error: "Must provide driver_id or partner_id" },
+      { error: "Must provide driver_id, partner_id or client_id" },
       { status: 400 }
     );
   }
 
   // Resolve the auth user_id + entity_type for the settlement row.
   let userId: string | null = null;
-  let entityType: "driver" | "restaurant" | null = null;
+  let entityType: "driver" | "restaurant" | "client" | null = null;
   let targetType = "";
 
-  if (driver_id) {
+  if (client_id) {
+    // A customer's wallet is keyed on their auth user id directly — there is
+    // no drivers/partners row to resolve through. The balance trigger keys on
+    // user_id alone and ignores entity_type, so crediting a client needs no
+    // schema change; it is the same ledger the other two use.
+    const { data } = await supabaseAdmin
+      .from("profiles")
+      .select("id")
+      .eq("id", client_id)
+      .single();
+    userId = data?.id ?? null;
+    entityType = "client";
+    targetType = "client";
+  } else if (driver_id) {
     const { data } = await supabaseAdmin
       .from("drivers")
       .select("user_id")

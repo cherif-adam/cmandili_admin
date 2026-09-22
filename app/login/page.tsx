@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useState, useEffect } from "react";
+import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
 import { Lock, Mail, AlertCircle, ArrowLeft, CheckCircle } from "lucide-react";
@@ -233,11 +234,23 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <div className="min-h-screen bg-gray-950 flex items-center justify-center px-4">
+    <div
+      className="flex min-h-screen items-center justify-center px-4"
+      style={{ background: "var(--bg)" }}
+    >
       <div className="w-full max-w-sm">
-        <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-white">Amana</h1>
-          <p className="text-gray-400 mt-1 text-sm">Panneau d'administration</p>
+        <div className="mb-8 text-center">
+          <Image
+            src="/logo.png"
+            alt="Amana"
+            width={88}
+            height={88}
+            className="mx-auto mb-3 object-contain"
+            priority
+          />
+          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+            Panneau d&apos;administration
+          </p>
         </div>
         <Suspense fallback={<div className="h-48 bg-gray-900 rounded-xl animate-pulse" />}>
           <LoginForm />

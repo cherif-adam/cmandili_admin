@@ -1,5 +1,7 @@
 export const dynamic = 'force-dynamic'
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import PageHeader from "@/components/PageHeader";
+import { ClipboardList } from "lucide-react";
 
 const PAGE_SIZE = 50;
 
@@ -21,6 +23,17 @@ const ACTION_LABELS: Record<string, string> = {
   add_menu_item:              "Article ajouté au menu",
   update_menu_item:           "Article modifié (menu)",
   delete_menu_item:           "Article supprimé (menu)",
+  // Actions ajoutées avec les boutiques génériques, le support et la recharge
+  // de solde. Sans libellé, le journal affichait le code brut.
+  create_vendor:              "Boutique créée",
+  update_vendor:              "Boutique modifiée",
+  delete_vendor:              "Boutique supprimée",
+  create_vendor_category:     "Catégorie créée",
+  update_vendor_category:     "Catégorie modifiée",
+  delete_vendor_category:     "Catégorie supprimée",
+  update_restaurant_categories: "Catégories restaurant modifiées",
+  update_support_ticket:      "Ticket support mis à jour",
+  wallet_topup:               "Solde rechargé",
 };
 
 const ACTION_GROUPS: Record<string, string[]> = {
@@ -31,6 +44,11 @@ const ACTION_GROUPS: Record<string, string[]> = {
   "Promotions":     ["create_promo", "update_promo", "delete_promo"],
   "Paramètres":     ["update_commission_rates"],
   "Menus":          ["add_menu_item", "update_menu_item", "delete_menu_item"],
+  "Boutiques":      ["create_vendor", "update_vendor", "delete_vendor"],
+  "Catégories":     ["create_vendor_category", "update_vendor_category",
+                     "delete_vendor_category", "update_restaurant_categories"],
+  "Support":        ["update_support_ticket"],
+  "Portefeuille":   ["wallet_topup"],
 };
 
 function formatDetails(details: Record<string, unknown> | null): string {
@@ -84,14 +102,9 @@ export default async function AuditPage({
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-white">Journal d&apos;activité</h2>
-          <p className="text-sm text-gray-400 mt-1">
-            {count ?? 0} action{(count ?? 0) !== 1 ? "s" : ""} enregistrée{(count ?? 0) !== 1 ? "s" : ""}
-          </p>
-        </div>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-2">
+        <PageHeader icon={ClipboardList} title={"Journal d&apos;activité"} subtitle={<>{count ?? 0} action{(count ?? 0) !== 1 ? "s" : ""} enregistrée{(count ?? 0) !== 1 ? "s" : ""}</>} />
       </div>
 
       {/* Filters */}

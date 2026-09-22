@@ -5,9 +5,12 @@ import { useRouter } from "next/navigation";
 import { X, Wallet, Check } from "lucide-react";
 
 interface TopUpButtonProps {
-  /** Provide exactly one of driverId / partnerId. */
+  /** Provide exactly one of driverId / partnerId / clientId. */
   driverId?: string;
   partnerId?: string;
+  /** A customer's auth user id. Customers have no drivers/partners row; the
+   *  wallet trigger keys on user_id alone, so the same ledger credits them. */
+  clientId?: string;
   entityName: string;
   currentBalance?: number | null;
 }
@@ -17,6 +20,7 @@ const QUICK_AMOUNTS = [50, 100, 200];
 export default function TopUpButton({
   driverId,
   partnerId,
+  clientId,
   entityName,
   currentBalance,
 }: TopUpButtonProps) {
@@ -42,6 +46,7 @@ export default function TopUpButton({
         body: JSON.stringify({
           driver_id: driverId,
           partner_id: partnerId,
+          client_id: clientId,
           amount: value,
         }),
       });

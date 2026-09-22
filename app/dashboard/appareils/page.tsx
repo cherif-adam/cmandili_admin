@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import StatsCard from "@/components/StatsCard";
 import ExportButton from "@/components/ExportButton";
 import { BellOff, Truck, UtensilsCrossed, Smartphone } from "lucide-react";
+import PageHeader from "@/components/PageHeader";
 
 type AccountType = "driver" | "restaurant" | "supermarket";
 
@@ -85,9 +86,9 @@ export default async function AppareilsPage() {
   ]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-white">État des notifications (FCM)</h2>
+        <PageHeader icon={BellOff} title={"État des notifications (FCM)"} />
         <ExportButton
           filename="appareils"
           title="État des notifications"

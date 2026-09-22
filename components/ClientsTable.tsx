@@ -40,6 +40,7 @@ export default function ClientsTable({ clients }: { clients: ClientData[] }) {
               <th className="px-5 py-3 font-medium">Email</th>
               <th className="px-5 py-3 font-medium">Commandes</th>
               <th className="px-5 py-3 font-medium">Total dépensé</th>
+              <th className="px-5 py-3 font-medium">Solde</th>
               <th className="px-5 py-3 font-medium">Statut</th>
               <th className="px-5 py-3 font-medium">Inscription</th>
               <th className="px-5 py-3 font-medium">Action</th>

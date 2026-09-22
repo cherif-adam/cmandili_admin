@@ -1,6 +1,7 @@
 ﻿export const dynamic = 'force-dynamic'
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import StatsCard from "@/components/StatsCard";
+import PageHeader from "@/components/PageHeader";
 import RevenueChart from "@/components/RevenueChart";
 import {
   Truck,
@@ -9,6 +10,7 @@ import {
   TrendingUp,
   CircleDollarSign,
   Users,
+  LayoutDashboard,
 } from "lucide-react";
 
 async function getCommissionRates() {
@@ -102,24 +104,23 @@ export default async function DashboardPage() {
   const pct = (r: number) => `${(r * 100).toFixed(0)}%`;
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-white">Vue d&apos;ensemble</h2>
-        <p className="text-sm text-gray-400 mt-1">
-          {new Date().toLocaleDateString("fr-TN", {
-            weekday: "long",
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-          })}
-        </p>
-      </div>
+    <div className="space-y-4">
+      <PageHeader
+        icon={LayoutDashboard}
+        title="Vue d'ensemble"
+        subtitle={new Date().toLocaleDateString("fr-TN", {
+          weekday: "long",
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        })}
+      />
 
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
         <StatsCard
           title="Commandes aujourd'hui"
           value={stats.todayOrders}
-          subtitle={`${stats.deliveredToday} livrÃ©es`}
+          subtitle={`${stats.deliveredToday} livrées`}
           icon={ShoppingBag}
           color="blue"
         />

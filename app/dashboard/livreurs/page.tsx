@@ -4,6 +4,7 @@ import DriverRow from "@/components/DriverRow";
 import StatsCard from "@/components/StatsCard";
 import ExportButton from "@/components/ExportButton";
 import { Truck, CircleDollarSign, ShieldX, Wifi } from "lucide-react";
+import PageHeader from "@/components/PageHeader";
 
 async function getDrivers() {
   const { data: drivers } = await supabaseAdmin
@@ -23,6 +24,11 @@ async function getDrivers() {
       .from("wallets")
       .select("user_id, balance, status")
       .in("user_id", userIds),
+    // `driver_fee_cut` is stamped on each order by a database trigger at the
+    // moment of delivery, using the commission rate live at that time. The
+    // trigger is deliberately non-retroactive, so older orders carry the rate
+    // they were charged under — which is why a driver's total commission does
+    // not always equal today's rate applied to their collected fees.
     supabaseAdmin
       .from("orders")
       .select("driver_id, delivery_fee, driver_fee_cut")
@@ -91,9 +97,9 @@ export default async function LivreursPage() {
   ]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-white">Livreurs</h2>
+        <PageHeader icon={Truck} title={"Livreurs"} />
         <ExportButton
           filename="livreurs"
           title="Liste des livreurs"
@@ -135,7 +141,7 @@ export default async function LivreursPage() {
         <div className="px-5 py-4 border-b border-gray-800">
           <h3 className="font-semibold text-white">Liste des livreurs</h3>
           <p className="text-xs text-gray-400 mt-0.5">
-            Commission plateforme : 23% des frais de livraison
+            Taux actuel : 23% des frais de livraison — les commandes passées gardent le taux en vigueur au moment de leur livraison.
           </p>
         </div>
         <div className="overflow-x-auto">
@@ -146,7 +152,7 @@ export default async function LivreursPage() {
                 <th className="px-5 py-3 font-medium">Statut</th>
                 <th className="px-5 py-3 font-medium">Livraisons</th>
                 <th className="px-5 py-3 font-medium">Frais collectés</th>
-                <th className="px-5 py-3 font-medium">Commission due (23%)</th>
+                <th className="px-5 py-3 font-medium">Commission due</th>
                 <th className="px-5 py-3 font-medium">Solde wallet</th>
                 <th className="px-5 py-3 font-medium">Compte</th>
                 <th className="px-5 py-3 font-medium">Action</th>

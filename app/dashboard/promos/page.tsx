@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import StatsCard from "@/components/StatsCard";
 import PromosClient, { PromoCode } from "@/components/PromosClient";
 import { Tag, CheckCircle, TrendingUp } from "lucide-react";
+import PageHeader from "@/components/PageHeader";
 
 async function getPromos(): Promise<PromoCode[]> {
   const { data, error } = await supabaseAdmin
@@ -24,11 +25,8 @@ export default async function PromosPage() {
   const totalUses = promos.reduce((s, p) => s + p.used_count, 0);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-white">Promotions</h2>
-        <p className="text-sm text-gray-400 mt-1">Gestion des codes promo</p>
-      </div>
+    <div className="space-y-4">
+      <PageHeader icon={Tag} title={"Promotions"} subtitle={<>Gestion des codes promo</>} />
 
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
         <StatsCard title="Total codes" value={promos.length} icon={Tag} color="orange" />

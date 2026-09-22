@@ -300,7 +300,7 @@ export default function GhostGroceryClient({
             <div className="px-5 py-3 border-b border-gray-800 bg-gray-800/40">
               <h3 className="font-semibold text-white text-sm">{cat}</h3>
             </div>
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto"><table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-xs text-gray-500 border-b border-gray-800">
                   <th className="px-5 py-2 font-medium">Produit</th>
@@ -361,7 +361,7 @@ export default function GhostGroceryClient({
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           </div>
         ))
       )}

@@ -4,6 +4,7 @@ import StatsCard from "@/components/StatsCard";
 import RestaurantRow from "@/components/RestaurantRow";
 import ExportButton from "@/components/ExportButton";
 import { UtensilsCrossed, CircleDollarSign, TrendingUp } from "lucide-react";
+import PageHeader from "@/components/PageHeader";
 
 async function getRestaurants() {
   // restaurants has no partner_id column — the link is partners.entity_id = restaurants.id (text)
@@ -95,9 +96,9 @@ export default async function RestaurantsPage() {
   ]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-white">Restaurants & Partenaires</h2>
+        <PageHeader icon={UtensilsCrossed} title={"Restaurants & Partenaires"} />
         <ExportButton
           filename="restaurants"
           title="Restaurants & Partenaires"

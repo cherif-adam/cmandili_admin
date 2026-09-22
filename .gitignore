@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Gradle build cache — landed here by accident from a Flutter build run in
+# the wrong directory. Nothing in the admin (a Next.js app) needs it.
+/android/

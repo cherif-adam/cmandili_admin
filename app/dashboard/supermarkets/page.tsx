@@ -2,6 +2,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import StatsCard from "@/components/StatsCard";
 import SupermarketRow from "@/components/SupermarketRow";
 import { ShoppingCart, TrendingUp, Ghost } from "lucide-react";
+import PageHeader from "@/components/PageHeader";
 
 async function getSupermarkets() {
   const { data: supermarkets, error } = await supabaseAdmin
@@ -43,8 +44,8 @@ export default async function SupermarketsPage() {
   const ghostCount = supermarkets.filter((s) => s.is_ghost_restaurant).length;
 
   return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-white">Supermarchés</h2>
+    <div className="space-y-4">
+      <PageHeader icon={ShoppingCart} title={"Supermarchés"} />
 
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
         <StatsCard
