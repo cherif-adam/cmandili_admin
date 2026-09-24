@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic'
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import LiveMap from "@/components/LiveMap";
+import LiveMap, { type FleetJob, type FleetPoint } from "@/components/LiveMap";
 import StatsCard from "@/components/StatsCard";
 import PageHeader from "@/components/PageHeader";
 import { Truck, Wifi, WifiOff, Navigation, MapPin } from "lucide-react";
@@ -21,6 +21,47 @@ import { Truck, Wifi, WifiOff, Navigation, MapPin } from "lucide-react";
 /** Beyond this, a position is stale and the driver is drawn as offline. */
 const STALE_AFTER_MINUTES = 10;
 
+/** The statuses that mean a driver is mid-job and worth drawing a route for. */
+const ACTIVE_ORDER_STATUSES = ["onTheWay", "pickedUp", "accepted", "preparing"];
+
+/**
+ * Which job to draw when a driver is carrying more than one. Lowest rank wins,
+ * i.e. the one furthest along — that is the leg they are physically driving
+ * right now, and the only one whose route matches where they will actually go
+ * next.
+ */
+const STATUS_RANK: Record<string, number> = {
+  onTheWay: 0,
+  pickedUp: 1,
+  preparing: 2,
+  accepted: 3,
+};
+
+/**
+ * A (0,0) coordinate is the placeholder a freshly-created row carries, not a
+ * position off the coast of Africa. Treat it as missing everywhere.
+ */
+function usablePoint(
+  lat: unknown,
+  lng: unknown,
+  label: string,
+): FleetPoint | null {
+  const la = Number(lat);
+  const ln = Number(lng);
+  if (!Number.isFinite(la) || !Number.isFinite(ln)) return null;
+  if (la === 0 && ln === 0) return null;
+  return { lat: la, lng: ln, label };
+}
+
+/** The address JSON on an order row; three shapes exist in the wild, all of
+ *  which carry latitude/longitude. */
+type AddressJson = {
+  latitude?: number | string | null;
+  longitude?: number | string | null;
+  fullAddress?: string | null;
+  label?: string | null;
+} | null;
+
 async function getFleet() {
   const { data: drivers, error } = await supabaseAdmin
     .from("drivers")
@@ -33,19 +74,83 @@ async function getFleet() {
     userIds.length
       ? supabaseAdmin.from("profiles").select("id, full_name, phone").in("id", userIds)
       : Promise.resolve({ data: [] as { id: string; full_name: string | null; phone: string | null }[] }),
+    // Widened from `driver_id, status`: the map needs both ends of the job to
+    // draw a route, not just a count of how many a driver is carrying.
     supabaseAdmin
       .from("orders")
-      .select("driver_id, status")
-      .in("status", ["onTheWay", "pickedUp", "accepted", "preparing"]),
+      .select(
+        "id, driver_id, status, restaurant_id, supermarket_id, delivery_address, pickup_address"
+      )
+      .in("status", ACTIVE_ORDER_STATUSES),
   ]);
+
+  // Pickup coordinates for the food/grocery jobs. Courier and facture orders
+  // carry their own pickup_address instead and need no lookup.
+  const venueIds = [
+    ...new Set(
+      (activeOrders ?? [])
+        .map((o) => o.restaurant_id ?? o.supermarket_id)
+        .filter((id): id is string => Boolean(id))
+    ),
+  ];
+  const { data: venues } = venueIds.length
+    ? await supabaseAdmin
+        .from("vendors")
+        .select("id, name, latitude, longitude")
+        .in("id", venueIds)
+    : { data: [] as { id: string; name: string; latitude: number | null; longitude: number | null }[] };
+  const venueById = Object.fromEntries((venues ?? []).map((v) => [v.id, v]));
 
   const profileById = Object.fromEntries(
     (profiles ?? []).map((p) => [p.id, p])
   );
   const activeByDriver: Record<string, number> = {};
+  const jobByDriver: Record<string, FleetJob> = {};
   for (const o of activeOrders ?? []) {
     if (!o.driver_id) continue;
     activeByDriver[o.driver_id] = (activeByDriver[o.driver_id] ?? 0) + 1;
+
+    const venue = venueById[o.restaurant_id ?? o.supermarket_id ?? ""];
+    const pickupAddr = o.pickup_address as AddressJson;
+    const pickup = venue
+      ? usablePoint(venue.latitude, venue.longitude, venue.name ?? "Point de retrait")
+      : usablePoint(
+          pickupAddr?.latitude,
+          pickupAddr?.longitude,
+          pickupAddr?.fullAddress ?? "Point de retrait"
+        );
+    const deliveryAddr = o.delivery_address as AddressJson;
+    const dropoff = usablePoint(
+      deliveryAddr?.latitude,
+      deliveryAddr?.longitude,
+      deliveryAddr?.fullAddress ?? deliveryAddr?.label ?? "Livraison"
+    );
+
+    // Before the parcel is in the car the driver is heading to the pickup;
+    // after it, to the customer. This mirrors the driver app's `beforePickup`
+    // rule (order_tracking_screen.dart) rather than the client app's, because
+    // this map is watching the driver. Falling back to the other end keeps a
+    // route drawable when one side has no usable coordinates.
+    const beforePickup = o.status !== "pickedUp" && o.status !== "onTheWay";
+    const target = (beforePickup ? pickup : dropoff) ?? dropoff ?? pickup;
+    if (!target) continue;
+
+    const job: FleetJob = {
+      orderId: o.id,
+      status: o.status,
+      leg: target === pickup ? "pickup" : "dropoff",
+      target,
+      pickup,
+      dropoff,
+    };
+    const held = jobByDriver[o.driver_id];
+    const rank = STATUS_RANK[o.status] ?? 99;
+    const heldRank = held ? STATUS_RANK[held.status] ?? 99 : 100;
+    // Tie-break on id so a driver with two jobs at the same stage doesn't get
+    // a different route drawn on every refresh.
+    if (rank < heldRank || (rank === heldRank && held && o.id < held.orderId)) {
+      jobByDriver[o.driver_id] = job;
+    }
   }
 
   const now = Date.now();
@@ -63,6 +168,7 @@ async function getFleet() {
       isBlocked: d.is_blocked ?? false,
       minutesAgo,
       activeOrders: activeByDriver[d.id] ?? 0,
+      job: jobByDriver[d.id] ?? null,
     };
   });
 }

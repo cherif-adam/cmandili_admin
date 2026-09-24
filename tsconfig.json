@@ -30,5 +30,9 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules"]
+  // Test files are run by `node --test`, which strips types itself and needs
+  // the explicit .ts extension on relative imports -- a specifier tsc rejects
+  // unless allowImportingTsExtensions is on. Keeping them out of the program
+  // lets both tools stay happy.
+  "exclude": ["node_modules", "**/*.test.ts"]
 }
