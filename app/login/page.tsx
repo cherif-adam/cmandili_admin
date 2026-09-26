@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useEffect } from "react";
+import { Suspense, useState } from "react";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
@@ -21,11 +21,12 @@ function LoginForm() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
 
-  useEffect(() => {
-    if (searchParams.get("error") === "not_admin") {
-      setError("Ce compte n'a pas les droits administrateur.");
-    }
-  }, [searchParams]);
+  // Derived, not stored: ?error=not_admin is known at render time, and
+  // setting state from an effect for it cascades an extra render. `error`
+  // still wins once the form produces one of its own.
+  const notAdmin = searchParams.get("error") === "not_admin";
+  const shownError =
+    error ?? (notAdmin ? "Ce compte n'a pas les droits administrateur." : null);
 
   function switchView(next: "login" | "forgot") {
     setError(null);
@@ -64,14 +65,12 @@ function LoginForm() {
     setLoading(true);
 
     try {
-      const redirectTo =
-        typeof window !== "undefined"
-          ? `${window.location.origin}/reset-password`
-          : `${process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"}/reset-password`;
-
+      // No redirectTo: the project's shared "Reset password" template sends an
+      // 8-digit code, not a magic link, so there is no link to come back on.
+      // The three mobile apps already consume it that way; passing a redirect
+      // here only produced a link the template never renders.
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(
-        email,
-        { redirectTo }
+        email
       );
 
       if (resetError) {
@@ -79,8 +78,11 @@ function LoginForm() {
         return;
       }
 
-      setSuccess(
-        "Lien envoyé ! Vérifiez votre boîte mail (et le dossier spam)."
+      setSuccess("Code envoyé ! Vérifiez votre boîte mail (et le dossier spam).");
+      // Straight to the code screen, with the address prefilled.
+      setTimeout(
+        () => router.push(`/reset-password?email=${encodeURIComponent(email.trim())}`),
+        1200
       );
     } catch {
       setError("Une erreur inattendue s'est produite. Réessayez.");
@@ -110,10 +112,10 @@ function LoginForm() {
           </p>
         </div>
 
-        {error && (
+        {shownError && (
           <div className="flex items-start gap-2.5 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2.5">
             <AlertCircle size={16} className="text-red-400 mt-0.5 shrink-0" />
-            <p className="text-sm text-red-400">{error}</p>
+            <p className="text-sm text-red-400">{shownError}</p>
           </div>
         )}
 
@@ -163,10 +165,10 @@ function LoginForm() {
       onSubmit={handleLogin}
       className="bg-gray-900 border border-gray-800 rounded-xl p-6 space-y-4"
     >
-      {error && (
+      {shownError && (
         <div className="flex items-start gap-2.5 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2.5">
           <AlertCircle size={16} className="text-red-400 mt-0.5 shrink-0" />
-          <p className="text-sm text-red-400">{error}</p>
+          <p className="text-sm text-red-400">{shownError}</p>
         </div>
       )}
 
