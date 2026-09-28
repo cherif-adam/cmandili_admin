@@ -104,11 +104,11 @@ function LoginForm() {
         </button>
 
         <div>
-          <h2 className="text-sm font-semibold text-white">
+          <h2 className="text-sm font-semibold" style={{ color: "var(--text)" }}>
             Réinitialiser le mot de passe
           </h2>
-          <p className="text-xs text-gray-500 mt-0.5">
-            Entrez votre email pour recevoir un lien de réinitialisation.
+          <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
+            Entrez votre email pour recevoir un code à 8 chiffres.
           </p>
         </div>
 
@@ -152,7 +152,23 @@ function LoginForm() {
               disabled={loading}
               className="w-full bg-orange-500 hover:bg-orange-400 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-sm py-2.5 rounded-lg transition-colors"
             >
-              {loading ? "Envoi…" : "Envoyer le lien de réinitialisation"}
+              {loading ? "Envoi…" : "Envoyer le code"}
+            </button>
+
+            {/* Pour qui a deja recu son code et n'a pas besoin d'en redemander
+                un : on saute directement a l'ecran de saisie, avec l'adresse
+                deja remplie. */}
+            <button
+              type="button"
+              onClick={() =>
+                router.push(
+                  `/reset-password?email=${encodeURIComponent(email.trim())}`
+                )
+              }
+              className="w-full rounded px-1 py-1 text-xs underline underline-offset-2 transition-opacity hover:opacity-70 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
+              style={{ color: "var(--text-muted)" }}
+            >
+              J&apos;ai déjà un code
             </button>
           </form>
         )}
@@ -213,10 +229,19 @@ function LoginForm() {
           />
         </div>
         <div className="flex justify-end">
+          {/* Les utilitaires `gray-*` de Tailwind ne sont pas generes dans ce
+              projet : un `bg-gray-900` pose sur un element neuf ressort blanc.
+              Ce bouton portait `text-gray-500`, inerte, et retombait donc sur
+              --text-faint (#9aa4ad) sur carte blanche -- 2.3:1 de contraste,
+              soit un texte qu'on prend pour une legende desactivee. Avec 124
+              x 16 px et aucun soulignement, un clic a quelques pixels pres
+              tombait a cote. Couleur de marque, soulignement, zone de clic
+              elargie et anneau de focus visible au clavier. */}
           <button
             type="button"
             onClick={() => switchView("forgot")}
-            className="text-xs text-gray-500 hover:text-orange-400 transition-colors"
+            className="-mr-1 rounded px-1 py-1 text-xs underline underline-offset-2 transition-opacity hover:opacity-70 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
+            style={{ color: "var(--brand-text)" }}
           >
             Mot de passe oublié ?
           </button>
