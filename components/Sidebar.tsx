@@ -16,6 +16,7 @@ import {
   BarChart3,
   Users,
   Tag,
+  Percent,
   Settings,
   ClipboardList,
   LogOut,
@@ -61,7 +62,11 @@ const GROUPS = [
       { href: "/dashboard/clients", label: "Clients", icon: Users },
       { href: "/dashboard/finances", label: "Finances", icon: BarChart3 },
       { href: "/dashboard/fidelite", label: "Fidélité", icon: Gift },
-      { href: "/dashboard/promos", label: "Promotions", icon: Tag },
+      // Deux choses differentes, longtemps appelees pareil : les CODES que
+      // le client saisit au paiement, et les REMISES que le commercant pose
+      // sur ses articles.
+      { href: "/dashboard/promos", label: "Codes promo", icon: Tag },
+      { href: "/dashboard/promotions", label: "Promotions", icon: Percent },
     ],
   },
   {

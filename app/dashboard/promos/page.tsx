@@ -26,7 +26,11 @@ export default async function PromosPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader icon={Tag} title={"Promotions"} subtitle={<>Gestion des codes promo</>} />
+      <PageHeader
+        icon={Tag}
+        title={"Codes promo"}
+        subtitle={<>Codes saisis par le client au paiement</>}
+      />
 
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
         <StatsCard title="Total codes" value={promos.length} icon={Tag} color="orange" />

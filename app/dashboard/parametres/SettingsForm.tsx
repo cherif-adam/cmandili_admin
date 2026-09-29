@@ -5,11 +5,17 @@ import { useState } from "react";
 interface Props {
   restaurantRate: number;
   driverRate: number;
+  maxDiscountPercent: number;
 }
 
-export default function SettingsForm({ restaurantRate, driverRate }: Props) {
+export default function SettingsForm({
+  restaurantRate,
+  driverRate,
+  maxDiscountPercent,
+}: Props) {
   const [restPct, setRestPct] = useState((restaurantRate * 100).toFixed(2));
   const [drivPct, setDrivPct] = useState((driverRate * 100).toFixed(2));
+  const [maxPct, setMaxPct] = useState(String(maxDiscountPercent));
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState<{ ok: boolean; msg: string } | null>(null);
 
@@ -20,9 +26,19 @@ export default function SettingsForm({ restaurantRate, driverRate }: Props) {
 
     const rr = parseFloat(restPct) / 100;
     const dr = parseFloat(drivPct) / 100;
+    // Le plafond reste un POURCENTAGE : c'est ainsi que l'app partenaire le
+    // lit dans global_settings. Le diviser par 100 comme les commissions
+    // plafonnerait les remises a 0,7 %.
+    const mp = parseFloat(maxPct);
 
     if (isNaN(rr) || isNaN(dr) || rr <= 0 || rr >= 1 || dr <= 0 || dr >= 1) {
       setFeedback({ ok: false, msg: "Les taux doivent être entre 0 % et 100 % (exclus)" });
+      setLoading(false);
+      return;
+    }
+
+    if (isNaN(mp) || mp < 1 || mp > 99) {
+      setFeedback({ ok: false, msg: "Le plafond de remise doit être entre 1 % et 99 %" });
       setLoading(false);
       return;
     }
@@ -31,7 +47,11 @@ export default function SettingsForm({ restaurantRate, driverRate }: Props) {
       const res = await fetch("/api/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ restaurant_rate: rr, driver_rate: dr }),
+        body: JSON.stringify({
+          restaurant_rate: rr,
+          driver_rate: dr,
+          max_discount_percent: mp,
+        }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Erreur serveur");
@@ -97,6 +117,33 @@ export default function SettingsForm({ restaurantRate, driverRate }: Props) {
             Taux actuel en DB : {(driverRate * 100).toFixed(2)} %
           </p>
         </div>
+      </div>
+
+      {/* Plafond de remise */}
+      <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 space-y-3">
+        <div>
+          <h3 className="font-semibold text-white">Remise maximum par article</h3>
+          <p className="text-xs text-gray-400 mt-1">
+            Le pourcentage le plus élevé qu&apos;un commerçant peut appliquer depuis
+            son application. Au-delà, l&apos;écran de promotion refuse la saisie.
+            Ne touche pas aux promotions déjà en cours.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <input
+            type="number"
+            step="1"
+            min="1"
+            max="99"
+            value={maxPct}
+            onChange={(e) => setMaxPct(e.target.value)}
+            className="w-28 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-orange-500"
+          />
+          <span className="text-gray-400 text-sm">%</span>
+        </div>
+        <p className="text-xs text-gray-500">
+          Valeur actuelle en DB : {maxDiscountPercent} %
+        </p>
       </div>
 
       <div className="flex items-center gap-4">
