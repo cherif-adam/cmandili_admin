@@ -46,7 +46,25 @@ function LoginForm() {
       });
 
       if (signInError) {
-        setError("Email ou mot de passe incorrect.");
+        // Tout echec affichait « email ou mot de passe incorrect », y compris
+        // une panne du service : l'administrateur retapait un mot de passe
+        // pourtant juste. On distingue ce qui vient de lui de ce qui vient du
+        // serveur.
+        const m = signInError.message.toLowerCase();
+        const status = signInError.status ?? 0;
+        if (m.includes("invalid login credentials") || status === 400) {
+          setError("Email ou mot de passe incorrect.");
+        } else if (m.includes("email not confirmed")) {
+          setError("Confirmez votre email avant de vous connecter.");
+        } else if (status >= 500 || m.includes("unavailable")) {
+          setError(
+            "Le service est momentanement indisponible. Reessayez dans un instant."
+          );
+        } else if (m.includes("fetch") || m.includes("network")) {
+          setError("Probleme de connexion. Verifiez votre reseau.");
+        } else {
+          setError(`Connexion impossible : ${signInError.message}`);
+        }
         return;
       }
 
