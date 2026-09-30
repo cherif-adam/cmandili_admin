@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic'
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import SettingsForm from "./SettingsForm";
+import ChangePasswordForm from "./ChangePasswordForm";
 import { Settings } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 
@@ -32,7 +33,7 @@ export default async function ParametresPage() {
         <PageHeader
           icon={Settings}
           title="Paramètres"
-          subtitle="Commissions de la plateforme et plafond de remise"
+          subtitle="Commissions, plafond de remise et mot de passe"
         />
       </div>
 
@@ -41,6 +42,12 @@ export default async function ParametresPage() {
         driverRate={driverRate}
         maxDiscountPercent={maxDiscountPercent}
       />
+
+      {/* Le changement de mot de passe se fait entierement cote navigateur,
+          avec le client utilisateur : le mot de passe actuel ne transite par
+          aucun serveur, et supabaseAdmin pourrait le changer SANS verifier
+          l'ancien, ce qui viderait le controle de son sens. */}
+      <ChangePasswordForm />
     </div>
   );
 }
