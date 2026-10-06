@@ -160,6 +160,26 @@ body {
 .text-gray-500,
 .text-gray-600 { color: var(--text-faint) !important; }
 
+/* Les indications de saisie (placeholders).
+
+   `placeholder-gray-500` a ete ecrit pour un panneau sombre. Sur le theme
+   clair, le gray-500 reel de Tailwind tombe a hauteur du texte courant : le
+   placeholder se lit alors comme une valeur DEJA SAISIE. Un administrateur a
+   lu « admin@amana.tn » comme son email et « ######## » comme son mot de
+   passe, a clique sur Se connecter -- et rien ne s'est passe, les deux champs
+   etaient vides depuis le debut.
+
+   Le remappage couvre aussi les champs sans classe de placeholder, pour que
+   tout le panneau dise la meme chose. */
+.placeholder-gray-400::placeholder,
+.placeholder-gray-500::placeholder,
+.placeholder-gray-600::placeholder,
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-faint) !important;
+  opacity: 1; /* Firefox applique sinon une opacite de 0.54 par-dessus. */
+}
+
 /* Hover states written against the dark palette. */
 .hover\:bg-gray-800:hover { background-color: var(--surface-2) !important; }
 .hover\:bg-gray-700:hover { background-color: var(--border) !important; }

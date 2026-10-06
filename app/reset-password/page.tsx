@@ -75,7 +75,13 @@ function ResetPasswordForm() {
         if (msg.includes("expired")) {
           setError("Ce code a expiré. Demandez-en un nouveau depuis « Mot de passe oublié ».");
         } else if (msg.includes("invalid") || msg.includes("token")) {
-          setError("Code incorrect ou expiré. Vérifiez les 8 chiffres, ou demandez un nouveau code.");
+          // Une adresse sans compte ne recoit jamais de code : le symptome
+          // est le meme qu'un code faux, la cause n'est pas la.
+          setError(
+            "Code incorrect ou expiré. Vérifiez les 8 chiffres — et que l'email " +
+              "ci-dessus est bien celui de votre compte, car une adresse inconnue " +
+              "ne reçoit aucun code."
+          );
         } else if (msg.includes("rate") || msg.includes("many")) {
           setError("Trop de tentatives. Patientez une minute avant de réessayer.");
         } else {
@@ -155,7 +161,7 @@ function ResetPasswordForm() {
                     onChange={(e) => setEmail(e.target.value)}
                     required
                     autoComplete="username"
-                    placeholder="admin@amana.tn"
+                    placeholder="vous@exemple.com"
                     className={inputCls}
                   />
                 </div>
