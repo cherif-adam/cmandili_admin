@@ -84,10 +84,19 @@ async function getDashboardStats() {
     byDay[day].driver += Number(o.driver_fee_cut) || 0;
   });
   // ── Revenue per vertical ────────────────────────────────────────────────
-  // An order's vertical is NOT order_type alone: every generic-category order
-  // (flowers, pets, gifts, bakery, electronics) is stored as order_type
-  // 'food', because orders_order_type_check has no per-category value. The
-  // real vertical comes from the vendor it points at.
+  // An order's vertical is NOT order_type alone, and deriving it from the
+  // vendor keeps that true for the whole history.
+  //
+  // Migration 20260930090000 (applied manually, verified 2026-10-11) gave
+  // order_type a value per category, so orders placed since then do carry
+  // 'flowers', 'gifts', 'electronics' and the rest. But 5 older orders point
+  // at a vendor that no longer exists and keep 'food', and nothing guarantees
+  // a future order type matches a category name. The vendor's own category is
+  // the one source that cannot drift.
+  //
+  // (Until that verification this comment claimed the constraint had no
+  // per-category value. It did — the header on the migration file said
+  // "NON EXÉCUTÉ", which is its default wording, not a status.)
   const categoryOf = Object.fromEntries(
     (vendorsRes.data ?? []).map((v) => [v.id, v.category as string])
   );
