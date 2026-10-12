@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   Truck,
   MapPin,
+  PackageCheck,
   UtensilsCrossed,
   ShoppingCart,
   Store,
@@ -43,6 +44,7 @@ const PRIMARY = [
   { href: "/dashboard/commandes", label: "Commandes", icon: ShoppingBag },
   { href: "/dashboard/livreurs", label: "Livreurs", icon: Truck },
   { href: "/dashboard/carte", label: "Carte", icon: MapPin },
+  { href: "/dashboard/colis", label: "Bons colis", icon: PackageCheck },
 ];
 
 const GROUPS = [
