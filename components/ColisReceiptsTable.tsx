@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, Lock, MapPin, ShieldCheck, ShieldX } from "lucide-react";
+import { AlertTriangle, FileDown, Lock, MapPin, ShieldCheck, ShieldX } from "lucide-react";
 
 export interface ColisReceipt {
   order_id: string;
@@ -270,17 +270,33 @@ export default function ColisReceiptsTable({
                     </div>
                   </div>
                 ) : (
-                  r.order_status !== "delivered" && (
-                    <button
-                      onClick={() => {
-                        setClosing(r.order_id);
-                        setReason("");
-                      }}
-                      className="px-3 py-2 rounded-lg border border-red-300 text-red-700 text-sm"
+                  <div className="flex flex-wrap gap-2">
+                    {/* Pièce de preuve pour un litige, un assureur ou une
+                        plainte. Un lien, pas un fetch : le navigateur gère le
+                        téléchargement, et la route exige déjà la session
+                        admin (requireAdmin). Disponible sur TOUT bon, même
+                        incomplet — un bon dont les preuves manquent est
+                        précisément celui qu'un litige réclame, et le PDF
+                        écrit « Non enregistré » là où le serveur n'a rien. */}
+                    <a
+                      href={`/api/colis/pdf?order_id=${encodeURIComponent(r.order_id)}`}
+                      className="px-3 py-2 rounded-lg border text-sm inline-flex items-center gap-1.5 hover:bg-gray-50"
                     >
-                      Clôturer de force
-                    </button>
-                  )
+                      <FileDown className="w-4 h-4" />
+                      Télécharger le bon (PDF)
+                    </a>
+                    {r.order_status !== "delivered" && (
+                      <button
+                        onClick={() => {
+                          setClosing(r.order_id);
+                          setReason("");
+                        }}
+                        className="px-3 py-2 rounded-lg border border-red-300 text-red-700 text-sm"
+                      >
+                        Clôturer de force
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
             )}
