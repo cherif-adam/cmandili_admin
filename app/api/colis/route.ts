@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { logAudit, requireAdmin } from "@/lib/audit";
+import { createSupabaseServerClient } from "@/lib/supabase-server";
 
 /**
  * Bon de prise en charge Colis — actions administrateur.
@@ -33,11 +34,15 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // La RPC est SECURITY DEFINER et vérifie elle-même que l'appelant est
-  // admin. Le client service-role la traverse, d'où le passage par
-  // auth.uid() -- on enregistre donc l'auteur dans l'audit ci-dessous, qui
-  // est notre trace fiable côté dashboard.
-  const { error } = await supabaseAdmin.rpc("colis_admin_force_close", {
+  // Client scopé à l'admin connecté, PAS supabaseAdmin.
+  //
+  // La RPC lit auth.uid() deux fois : pour vérifier is_admin, et pour
+  // enregistrer qui a clôturé dans admin_override_by. Appelée avec la clé
+  // service_role il n'y a pas de JWT, donc auth.uid() vaut NULL : le contrôle
+  // échouerait systématiquement et, s'il passait, la preuve ne dirait pas qui
+  // a signé. Le cookie de session porte l'identité réelle.
+  const userScoped = await createSupabaseServerClient();
+  const { error } = await userScoped.rpc("colis_admin_force_close", {
     p_order_id: order_id,
     p_reason: String(reason).trim(),
   });
