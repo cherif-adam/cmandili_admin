@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 
 import {
   NOT_RECORDED,
+  CURRENT_SUFFIX,
   buildColisReceiptPdf,
   canonicalJson,
   declaredValueLabel,
@@ -16,10 +17,13 @@ import {
   mapsLink,
   formatAddress,
   orNotRecorded,
+  orderStatusLabel,
   pdfFileName,
   receiptFingerprint,
+  sourcedValue,
   toWinAnsi,
   type ColisReceiptRecord,
+  type CurrentFallbacks,
   type ReceiptPhotos,
 } from "./colis-receipt-pdf.ts";
 
@@ -39,6 +43,7 @@ function fullRecord(): ColisReceiptRecord {
       delivery_mode: "code",
       receiver_label: null,
       no_code_accepted_at: null,
+      proof_status: "complete",
     },
     sender: {
       name: "Amine Ben Salah",
@@ -50,12 +55,7 @@ function fullRecord(): ColisReceiptRecord {
       phone: "+216 22 987 654",
       address: "Avenue Hédi Chaker, Sousse",
     },
-    driver: {
-      name: "Mohamed Trabelsi",
-      phone: "+216 25 555 111",
-      cin: "09876543",
-      plate: "123 TU 4567",
-    },
+    driver: { name: "Mohamed Trabelsi", cin: "09876543", plate: "123 TU 4567" },
     parcel: { description: "Dossier papier scellé", declared_value: 150 },
     pickup: {
       at: "2026-10-12T09:05:00.000Z",
@@ -85,10 +85,11 @@ function emptyRecord(): ColisReceiptRecord {
       delivery_mode: "no_code",
       receiver_label: null,
       no_code_accepted_at: null,
+      proof_status: "missing",
     },
     sender: { name: null, phone: null, address: null },
     recipient: { name: null, phone: null, address: null },
-    driver: { name: null, phone: null, cin: null, plate: null },
+    driver: { name: null, cin: null, plate: null },
     parcel: { description: null, declared_value: null },
     pickup: { at: null, lat: null, lng: null, confirmed: false },
     delivery: {
@@ -377,6 +378,50 @@ test("le document rendu est un PDF valide", () => {
  * caractère Unicode ne trouve donc jamais rien. Une première version de ce
  * test échouait pour cette seule raison, sur un en-tête pourtant correct.
  */
+/**
+ * Le texte VISIBLE du PDF, dérendu.
+ *
+ * Indispensable pour tout ce qui est long : `splitTextToSize` découpe une
+ * phrase en plusieurs opérateurs de texte, donc chercher la sous-chaîne dans
+ * les octets échoue dès que le libellé passe à la ligne — ce qui n'a rien à
+ * voir avec la correction du document. On extrait les littéraux `(…) Tj`, on
+ * les redécode depuis WinAnsi et on recolle, puis on compare du français
+ * lisible.
+ *
+ * Les assertions sur la STRUCTURE (pas d'URL signée, présence de /DCTDecode)
+ * restent sur les octets bruts : elles portent justement sur ce qui n'est pas
+ * du texte visible.
+ */
+function pdfText(bytes: Uint8Array): string {
+  const latin = Buffer.from(bytes).toString("latin1");
+  const cp1252: Record<number, string> = {
+    0x80: "€", 0x82: "‚", 0x83: "ƒ", 0x84: "„", 0x85: "…", 0x86: "†",
+    0x87: "‡", 0x88: "ˆ", 0x89: "‰", 0x8a: "Š", 0x8b: "‹", 0x8c: "Œ",
+    0x8e: "Ž", 0x91: "'", 0x92: "'", 0x93: "“", 0x94: "”",
+    0x95: "•", 0x96: "–", 0x97: "—", 0x98: "˜", 0x99: "™", 0x9a: "š",
+    0x9b: "›", 0x9c: "œ", 0x9e: "ž", 0x9f: "Ÿ",
+  };
+  const out: string[] = [];
+  const re = /\(((?:[^()\\]|\\.)*)\)\s*Tj/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(latin)) !== null) {
+    const unescaped = m[1]
+      .replace(/\\([()\\])/g, "$1")
+      .replace(/\\(\d{3})/g, (_, o: string) =>
+        String.fromCharCode(parseInt(o, 8)),
+      );
+    let s = "";
+    for (const ch of unescaped) {
+      const b = ch.charCodeAt(0) & 0xff;
+      s += cp1252[b] ?? String.fromCharCode(b);
+    }
+    out.push(s);
+  }
+  // Recollé et espaces normalisés : une phrase coupée par le retour à la
+  // ligne redevient une phrase.
+  return out.join(" ").replace(/\s+/g, " ");
+}
+
 function asWinAnsi(s: string): string {
   const extras: Record<string, number> = {
     "€": 0x80, "‚": 0x82, "ƒ": 0x83, "„": 0x84, "…": 0x85, "†": 0x86,
@@ -585,6 +630,177 @@ test("l'export est journalisé avec la commande et l'admin", () => {
   assert.match(routeCode, /action_type: "colis_receipt_pdf_export"/);
   assert.match(routeCode, /target_id: orderId/);
   assert.match(routeCode, /admin_id: admin\.id/);
+});
+
+// ── Repli sur les données courantes ─────────────────────────────────────────
+//
+// Une commande livrée par une ancienne version de l'app livreur n'a figé ni
+// nom, ni plaque, ni CIN. Le bon affichait alors « Non enregistré » sur les
+// quatre lignes livreur, alors que la commande porte un driver_id : taire une
+// information qu'on détient affaiblit la pièce. Le repli comble ces trous,
+// sans jamais écraser une valeur figée et sans entrer dans l'empreinte.
+
+const FULL_FALLBACK: CurrentFallbacks = {
+  driver: {
+    name: "Livreur Courant",
+    phone: "+216 99 000 111",
+    cin: "11112222",
+    plate: "999 TU 1",
+  },
+  senderName: "Expéditeur Courant",
+};
+
+test("une valeur figée l'emporte toujours sur la valeur courante", () => {
+  const v = sourcedValue("123 TU 4567", "999 TU 1");
+  assert.equal(v.text, "123 TU 4567");
+  assert.equal(v.fromCurrent, false);
+  // Surtout : pas de suffixe sur une valeur qui a valeur de preuve.
+  assert.ok(!v.text.includes(CURRENT_SUFFIX));
+});
+
+test("à défaut de figé, la valeur courante est prise ET étiquetée", () => {
+  const v = sourcedValue(null, "999 TU 1");
+  assert.equal(v.fromCurrent, true);
+  assert.ok(v.text.startsWith("999 TU 1"));
+  assert.ok(v.text.includes(CURRENT_SUFFIX));
+});
+
+test("rien de figé et rien de courant : « Non enregistré », sans suffixe", () => {
+  for (const [frozen, current] of [
+    [null, null],
+    [null, "   "],
+    ["", undefined],
+  ]) {
+    const v = sourcedValue(frozen, current);
+    assert.equal(v.text, NOT_RECORDED);
+    assert.equal(v.fromCurrent, false);
+    assert.ok(!v.text.includes(CURRENT_SUFFIX));
+  }
+});
+
+test("le bon d'une ancienne APK nomme le livreur au lieu de quatre blancs", () => {
+  const r = emptyRecord();
+  const text = pdfText(buildColisReceiptPdf(r, noPhotos, CTX, FULL_FALLBACK));
+  for (const v of ["Livreur Courant", "+216 99 000 111", "11112222", "999 TU 1",
+    "Expéditeur Courant"]) {
+    assert.ok(text.includes(v), `valeur de repli absente : ${v}`);
+  }
+  assert.ok(text.includes(CURRENT_SUFFIX), "chaque repli doit être étiqueté");
+});
+
+test("un bon complet n'emprunte rien au courant, même si le repli est fourni", () => {
+  const text = pdfText(buildColisReceiptPdf(fullRecord(), noPhotos, CTX, FULL_FALLBACK));
+  // Les valeurs figées sont là…
+  assert.ok(text.includes("Mohamed Trabelsi"));
+  assert.ok(text.includes("123 TU 4567"));
+  assert.ok(text.includes("09876543"));
+  // …et celles du repli ne les remplacent pas.
+  assert.ok(!text.includes("Livreur Courant"));
+  assert.ok(!text.includes("999 TU 1"));
+  assert.ok(!text.includes("11112222"));
+});
+
+test("sans repli disponible, tout reste « Non enregistré »", () => {
+  const text = pdfText(
+    buildColisReceiptPdf(emptyRecord(), noPhotos, CTX, {
+      driver: null,
+      senderName: null,
+    }),
+  );
+  assert.ok(text.includes(NOT_RECORDED));
+  assert.ok(!text.includes(CURRENT_SUFFIX));
+});
+
+test("le repli ne change pas l'empreinte", () => {
+  // C'est la garantie qui compte : l'empreinte atteste le bon figé. Si elle
+  // bougeait quand un livreur change de numéro, elle ne prouverait plus rien.
+  const r = emptyRecord();
+  const before = receiptFingerprint(r);
+  buildColisReceiptPdf(r, noPhotos, CTX, FULL_FALLBACK);
+  assert.equal(receiptFingerprint(r), before);
+
+  const other: CurrentFallbacks = {
+    driver: { name: "Autre", phone: "+216 1", cin: "9", plate: "1 TU 1" },
+    senderName: "Autre encore",
+  };
+  buildColisReceiptPdf(r, noPhotos, CTX, other);
+  assert.equal(receiptFingerprint(r), before);
+});
+
+test("la section intégrité liste les champs hors empreinte", () => {
+  const withFallback = pdfText(
+    buildColisReceiptPdf(emptyRecord(), noPhotos, CTX, FULL_FALLBACK),
+  );
+  assert.ok(withFallback.includes("Champs hors empreinte"));
+  for (const label of ["Livreur — nom", "Livreur — téléphone", "Livreur — CIN",
+    "Livreur — plaque", "Expéditeur — nom"]) {
+    assert.ok(
+      withFallback.includes(label),
+      `le récapitulatif doit nommer : ${label}`,
+    );
+  }
+
+  const allFrozen = pdfText(buildColisReceiptPdf(fullRecord(), noPhotos, CTX));
+  assert.ok(
+    allFrozen.includes("Aucun : toutes les valeurs affichées"),
+    "un bon entièrement figé doit le dire explicitement",
+  );
+});
+
+// ── Statuts ─────────────────────────────────────────────────────────────────
+
+test("les 8 statuts canoniques sont traduits en français", () => {
+  const expected: Record<string, string> = {
+    pending: "En attente",
+    confirmed: "Confirmée",
+    preparing: "En préparation",
+    ready: "Prête",
+    pickedUp: "Récupérée par le livreur",
+    onTheWay: "En route",
+    delivered: "Livrée",
+    cancelled: "Annulée",
+  };
+  for (const [raw, fr] of Object.entries(expected)) {
+    assert.equal(orderStatusLabel(raw), fr);
+  }
+});
+
+test("un statut inconnu ou absent n'est pas traduit au hasard", () => {
+  // La casse compte côté base (pickedUp, jamais picked_up) : une variante
+  // inattendue doit rester lisible telle quelle plutôt que de devenir un
+  // libellé inventé sur une pièce de preuve.
+  assert.equal(orderStatusLabel("picked_up"), "picked_up");
+  assert.equal(orderStatusLabel("quelque_chose"), "quelque_chose");
+  assert.equal(orderStatusLabel(null), NOT_RECORDED);
+  assert.equal(orderStatusLabel(""), NOT_RECORDED);
+});
+
+test("le PDF n'imprime plus le statut brut", () => {
+  const text = pdfText(buildColisReceiptPdf(fullRecord(), noPhotos, CTX));
+  assert.match(text, /Statut Livrée/);
+  assert.ok(!text.includes("delivered"));
+});
+
+// ── Preuves absentes (ancienne APK) ─────────────────────────────────────────
+
+test("proof_status missing affiche l'avertissement, deux fois", () => {
+  const r = emptyRecord();
+  r.order.proof_status = "missing";
+  const text = pdfText(buildColisReceiptPdf(r, noPhotos, CTX));
+  // Une section vide sans explication se lit comme un livreur qui n'a rien
+  // fait, voire comme une preuve effacée. Sections 6 ET 7.
+  const needle = "ancienne version de l'application livreur";
+  assert.equal(text.split(needle).length - 1, 2);
+});
+
+test("un bon avec preuves ne porte pas l'avertissement", () => {
+  const r = fullRecord();
+  r.order.proof_status = "complete";
+  assert.ok(
+    !pdfText(buildColisReceiptPdf(r, noPhotos, CTX)).includes(
+      "ancienne version de l'application",
+    ),
+  );
 });
 
 // ── Adresses ────────────────────────────────────────────────────────────────

@@ -6,6 +6,7 @@ import {
   pdfFileName,
   receiptFingerprint,
   type ColisReceiptRecord,
+  type CurrentFallbacks,
   type ReceiptPhotos,
 } from "@/lib/colis-receipt-pdf";
 
@@ -99,7 +100,7 @@ export async function GET(req: NextRequest) {
       supabaseAdmin
         .from("orders")
         .select(
-          "id, status, created_at, pickup_address, delivery_address, recipient_name, recipient_phone, sender_phone",
+          "id, status, created_at, user_id, driver_id, pickup_address, delivery_address, recipient_name, recipient_phone, sender_phone",
         )
         .eq("id", orderId)
         .maybeSingle(),
@@ -110,23 +111,65 @@ export async function GET(req: NextRequest) {
         .order("created_at", { ascending: true }),
     ]);
 
-  // Téléphone du livreur : profiles via drivers.user_id. C'est le numéro
-  // ACTUEL — le bon ne fige que le nom et la plaque — et le PDF le dit.
-  let driverPhone: string | null = null;
-  if (receipt.driver_id) {
+  // Données COURANTES du livreur et de l'expéditeur.
+  //
+  // Une commande livrée par une ancienne version de l'app livreur n'a figé ni
+  // nom, ni plaque, ni CIN : le bon affichait « Non enregistré » sur les
+  // quatre lignes alors que la commande porte un driver_id et qu'on sait donc
+  // qui a livré. Taire une information qu'on détient affaiblit la pièce.
+  //
+  // Elles ne remplacent jamais une valeur figée et n'entrent pas dans
+  // l'empreinte — elles sont passées séparément à buildColisReceiptPdf, qui
+  // les étiquette une par une et les récapitule en section 9.
+  //
+  // Le livreur est cherché via colis_receipts.driver_id SI le bon l'a figé,
+  // sinon via orders.driver_id. C'est justement le cas d'une ancienne APK :
+  // le bon n'a rien figé, driver_id y est NULL, mais la commande, elle, sait
+  // parfaitement qui a livré.
+  const fallbackDriverId = receipt.driver_id ?? order?.driver_id ?? null;
+  let driverFallback: CurrentFallbacks["driver"] = null;
+  if (fallbackDriverId) {
     const { data: driver } = await supabaseAdmin
       .from("drivers")
-      .select("user_id")
-      .eq("id", receipt.driver_id)
+      .select("user_id, vehicle_plate")
+      .eq("id", fallbackDriverId)
       .maybeSingle();
-    if (driver?.user_id) {
-      const { data: profile } = await supabaseAdmin
-        .from("profiles")
-        .select("phone")
-        .eq("id", driver.user_id)
-        .maybeSingle();
-      driverPhone = profile?.phone ?? null;
-    }
+
+    const [{ data: driverProfile }, { data: currentIdentity }] =
+      await Promise.all([
+        driver?.user_id
+          ? supabaseAdmin
+              .from("profiles")
+              .select("full_name, phone")
+              .eq("id", driver.user_id)
+              .maybeSingle()
+          : Promise.resolve({ data: null }),
+        // driver_identity porte le CIN COURANT du livreur (table admin-only),
+        // à ne pas confondre avec colis_receipt_identity, qui le fige par
+        // commande.
+        supabaseAdmin
+          .from("driver_identity")
+          .select("cin")
+          .eq("driver_id", fallbackDriverId)
+          .maybeSingle(),
+      ]);
+
+    driverFallback = {
+      name: driverProfile?.full_name ?? null,
+      phone: driverProfile?.phone ?? null,
+      cin: currentIdentity?.cin ?? null,
+      plate: driver?.vehicle_plate ?? null,
+    };
+  }
+
+  let senderNameFallback: string | null = null;
+  if (order?.user_id) {
+    const { data: senderProfile } = await supabaseAdmin
+      .from("profiles")
+      .select("full_name")
+      .eq("id", order.user_id)
+      .maybeSingle();
+    senderNameFallback = senderProfile?.full_name ?? null;
   }
 
   // Qui a signé la clôture forcée, par e-mail plutôt que par UUID : un UUID
@@ -149,6 +192,7 @@ export async function GET(req: NextRequest) {
       delivery_mode: receipt.delivery_mode,
       receiver_label: receipt.receiver_label ?? null,
       no_code_accepted_at: receipt.no_code_accepted_at ?? null,
+      proof_status: receipt.proof_status ?? null,
     },
     sender: {
       name: receipt.sender_name ?? null,
@@ -162,7 +206,6 @@ export async function GET(req: NextRequest) {
     },
     driver: {
       name: receipt.driver_name ?? null,
-      phone: driverPhone,
       cin: identity?.driver_cin ?? null,
       plate: receipt.driver_plate ?? null,
     },
@@ -208,10 +251,12 @@ export async function GET(req: NextRequest) {
   };
 
   const generatedAt = new Date().toISOString();
-  const bytes = buildColisReceiptPdf(record, photos, {
-    generatedAt,
-    generatedByEmail: admin.email ?? admin.id,
-  });
+  const bytes = buildColisReceiptPdf(
+    record,
+    photos,
+    { generatedAt, generatedByEmail: admin.email ?? admin.id },
+    { driver: driverFallback, senderName: senderNameFallback },
+  );
 
   // L'export est journalisé : savoir qui a sorti une pièce contenant un CIN
   // fait partie du dossier. La VALEUR du CIN, elle, n'entre pas dans le

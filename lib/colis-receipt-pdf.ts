@@ -46,12 +46,19 @@ export interface ColisReceiptRecord {
     delivery_mode: string;
     receiver_label: string | null;
     no_code_accepted_at: string | null;
+    /** pending | pickup_only | complete | missing. 'missing' = livrée par une
+     *  ancienne version de l'app livreur, sans aucune preuve enregistrée. */
+    proof_status: string | null;
   };
   sender: { name: string | null; phone: string | null; address: unknown };
   recipient: { name: string | null; phone: string | null; address: unknown };
+  /** Ce que le bon a réellement FIGÉ à la prise en charge, et rien d'autre.
+   *  Le téléphone n'y est pas : il n'a jamais été figé, il vient donc des
+   *  données courantes (voir CurrentFallbacks) et n'entre pas dans
+   *  l'empreinte — sinon celle-ci changerait le jour où le livreur change de
+   *  numéro, ce qui n'est pas ce qu'elle atteste. */
   driver: {
     name: string | null;
-    phone: string | null;
     cin: string | null;
     plate: string | null;
   };
@@ -71,6 +78,32 @@ export interface ColisReceiptRecord {
   };
   override: { at: string | null; reason: string | null; admin: string | null };
   disputes: ColisDisputeRecord[];
+}
+
+/**
+ * Données COURANTES, utilisées seulement quand le bon n'a rien figé.
+ *
+ * Une commande livrée par une ancienne version de l'app livreur n'a figé ni
+ * nom, ni plaque, ni CIN : le bon affichait alors « Non enregistré » partout
+ * côté livreur alors que la commande porte un driver_id et qu'on sait donc
+ * parfaitement qui a livré. Pour une pièce de preuve, taire une information
+ * qu'on détient est un défaut.
+ *
+ * Séparé de [ColisReceiptRecord] à dessein, et NON pris dans l'empreinte :
+ * ces valeurs peuvent changer après coup (un livreur change de numéro, un
+ * client renomme son profil). Les faire entrer dans l'empreinte la ferait
+ * varier sans qu'aucune preuve n'ait bougé. Le figé l'emporte toujours quand
+ * il existe, et tout ce qui vient d'ici est signalé dans le document, champ
+ * par champ, puis récapitulé en section 9.
+ */
+export interface CurrentFallbacks {
+  driver: {
+    name: string | null;
+    phone: string | null;
+    cin: string | null;
+    plate: string | null;
+  } | null;
+  senderName: string | null;
 }
 
 /** Photos déjà téléchargées depuis le bucket privé, en base64 brut. */
@@ -221,6 +254,65 @@ export function deliveryOutcomeLabel(record: ColisReceiptRecord): string {
   return `Code vérifié : ${NOT_RECORDED}`;
 }
 
+/**
+ * Les 8 statuts que la contrainte `orders_status_check` accepte, en français.
+ *
+ * La casse compte : l'app Flutter sérialise ses enums via
+ * `toString().split('.').last`, d'où `pickedUp` et `onTheWay` et jamais
+ * `picked_up` ni `on_the_way`. Un statut inconnu est rendu tel quel plutôt
+ * que traduit au hasard — un libellé inventé sur une preuve est pire qu'un
+ * mot anglais.
+ */
+const ORDER_STATUS_FR: Record<string, string> = {
+  pending: "En attente",
+  confirmed: "Confirmée",
+  preparing: "En préparation",
+  ready: "Prête",
+  pickedUp: "Récupérée par le livreur",
+  onTheWay: "En route",
+  delivered: "Livrée",
+  cancelled: "Annulée",
+};
+
+export function orderStatusLabel(status: string | null): string {
+  if (isBlank(status)) return NOT_RECORDED;
+  return ORDER_STATUS_FR[status as string] ?? (status as string);
+}
+
+/** Suffixe porté par toute valeur qui ne vient pas du bon figé. */
+export const CURRENT_SUFFIX = "(actuel — non figé à la prise en charge)";
+
+export interface SourcedValue {
+  /** Prêt à imprimer, suffixe compris. */
+  text: string;
+  /** Vrai quand la valeur vient des données courantes, pas du bon figé. */
+  fromCurrent: boolean;
+}
+
+/**
+ * Valeur figée si elle existe, sinon valeur courante, sinon « Non enregistré ».
+ *
+ * Le figé l'emporte TOUJOURS : c'est lui qui a valeur de preuve, et une
+ * plaque modifiée depuis ne doit jamais réécrire celle du jour de la remise.
+ */
+export function sourcedValue(
+  frozen: unknown,
+  current: unknown,
+): SourcedValue {
+  if (!isBlank(frozen)) {
+    return { text: String(frozen).trim(), fromCurrent: false };
+  }
+  if (!isBlank(current)) {
+    return { text: `${String(current).trim()} ${CURRENT_SUFFIX}`, fromCurrent: true };
+  }
+  return { text: NOT_RECORDED, fromCurrent: false };
+}
+
+/** Avertissement en tête des sections 6 et 7 quand aucune preuve n'existe. */
+export const NO_PROOF_NOTICE =
+  "Livraison effectuée avec une ancienne version de l'application livreur : " +
+  "preuves photo et GPS non disponibles pour cette commande.";
+
 export function disputeKindLabel(kind: string | null): string {
   switch (kind) {
     case "not_received":
@@ -354,10 +446,20 @@ export function buildColisReceiptPdf(
   record: ColisReceiptRecord,
   photos: ReceiptPhotos,
   ctx: GenerationContext,
+  fallbacks: CurrentFallbacks = { driver: null, senderName: null },
 ): Uint8Array {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const fingerprint = receiptFingerprint(record);
   let y = MARGIN;
+
+  // Récapitulé en section 9 : un lecteur doit pouvoir voir d'un coup d'œil ce
+  // que l'empreinte couvre et ce qu'elle ne couvre pas.
+  const fromCurrent: string[] = [];
+  const sourcedRow = (label: string, frozen: unknown, current: unknown) => {
+    const v = sourcedValue(frozen, current);
+    if (v.fromCurrent) fromCurrent.push(label);
+    return v;
+  };
 
   const ensureRoom = (needed: number) => {
     if (y + needed <= PAGE_H - MARGIN - 12) return;
@@ -481,11 +583,14 @@ export function buildColisReceiptPdf(
   row("Identifiant", printable(record.order.id));
   row("Créée le", formatTunis(record.order.created_at));
   row("Mode de remise", printable(deliveryModeLabel(record.order)));
-  row("Statut", printable(record.order.status));
+  row("Statut", printable(orderStatusLabel(record.order.status)));
 
   // 2. Expéditeur
   section("2. Expéditeur");
-  row("Nom", printable(record.sender.name));
+  row(
+    "Nom",
+    printable(sourcedRow("Expéditeur — nom", record.sender.name, fallbacks.senderName).text),
+  );
   row("Téléphone", printable(record.sender.phone));
   row("Adresse d'enlèvement", printable(formatAddress(record.sender.address)));
 
@@ -497,18 +602,45 @@ export function buildColisReceiptPdf(
 
   // 4. Livreur
   section("4. Livreur");
-  row("Nom (figé à la prise en charge)", printable(record.driver.name));
-  row("Téléphone (actuel)", printable(record.driver.phone));
-  row("CIN", printable(record.driver.cin));
-  row("Plaque (figée à la prise en charge)", printable(record.driver.plate));
+  // Le figé l'emporte ; à défaut, les données courantes du livreur de la
+  // commande, chaque valeur portant alors sa provenance.
+  row("Nom", printable(sourcedRow("Livreur — nom", record.driver.name, fallbacks.driver?.name).text));
+  row(
+    "Téléphone",
+    printable(sourcedRow("Livreur — téléphone", null, fallbacks.driver?.phone).text),
+  );
+  row("CIN", printable(sourcedRow("Livreur — CIN", record.driver.cin, fallbacks.driver?.cin).text));
+  row(
+    "Plaque",
+    printable(sourcedRow("Livreur — plaque", record.driver.plate, fallbacks.driver?.plate).text),
+  );
 
   // 5. Colis
   section("5. Colis");
   row("Description", printable(record.parcel.description));
   row("Valeur déclarée", declaredValueLabel(record.parcel.declared_value));
 
+  /**
+   * Pourquoi les sections 6 et 7 sont vides, quand elles le sont.
+   *
+   * Sans cette ligne, une section entièrement « Non enregistré » se lit comme
+   * un livreur qui n'a rien fait, voire comme une preuve effacée. La cause
+   * réelle est l'ancienne version de l'app livreur, et c'est ce que le
+   * document doit dire — surtout à un assureur.
+   */
+  const noProofNotice = () => {
+    if (record.order.proof_status !== "missing") return;
+    const lines = doc.splitTextToSize(NO_PROOF_NOTICE, CONTENT_W) as string[];
+    ensureRoom(lines.length * 4.2 + 3);
+    doc.setTextColor(150, 60, 0);
+    doc.text(lines, MARGIN, y);
+    doc.setTextColor(20);
+    y += lines.length * 4.2 + 2.5;
+  };
+
   // 6. Preuve de prise en charge
   section("6. Preuve de prise en charge");
+  noProofNotice();
   row("Heure serveur", formatTunis(record.pickup.at));
   gpsRow("Coordonnées GPS", record.pickup.lat, record.pickup.lng);
   row(
@@ -519,6 +651,7 @@ export function buildColisReceiptPdf(
 
   // 7. Preuve de remise
   section("7. Preuve de remise");
+  noProofNotice();
   row("Heure serveur", formatTunis(record.delivery.at));
   gpsRow("Coordonnées GPS", record.delivery.lat, record.delivery.lng);
   row("Distance à l'adresse", distanceLabel(record.delivery.distance_m));
@@ -542,6 +675,16 @@ export function buildColisReceiptPdf(
   // 9. Intégrité
   section("9. Intégrité du document");
   row("Empreinte SHA-256", fingerprint);
+  // Ce que l'empreinte NE couvre pas. Un lecteur doit pouvoir distinguer ce
+  // qui a valeur de preuve de ce qui n'est qu'une aide à l'identification.
+  row(
+    "Champs hors empreinte",
+    fromCurrent.length === 0
+      ? "Aucun : toutes les valeurs affichées proviennent du bon figé."
+      : `${fromCurrent.join(", ")} — ${printable(
+          "valeurs actuelles, non figées à la prise en charge et donc hors empreinte",
+        )}.`,
+  );
   ensureRoom(16);
   doc.setFontSize(8.5);
   doc.setTextColor(90);
