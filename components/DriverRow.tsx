@@ -165,7 +165,9 @@ export default function DriverRow({ driver }: { driver: DriverData }) {
                 : "bg-amber-500/20 text-amber-300 hover:bg-amber-500/30"
             }`}
           >
-            {verified ? "Vérifié" : `En attente (${(driver.missing ?? []).join(" + ")})`}
+            {/* Les pieces manquantes sont nommees ici comme partout ailleurs :
+                CIN / contrat / scan, separees par « / ». */}
+            {verified ? "Vérifié" : `En attente (${(driver.missing ?? []).join(" / ")})`}
           </button>
         </div>
       </td>

@@ -5,6 +5,11 @@ import StatsCard from "@/components/StatsCard";
 import ExportButton from "@/components/ExportButton";
 import { Truck, CircleDollarSign, ShieldX, Wifi } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
+import {
+  dossierStatusLabel,
+  isDossierComplete,
+  missingPieces,
+} from "@/lib/driver-verification";
 
 async function getDrivers() {
   const { data: drivers } = await supabaseAdmin
@@ -41,7 +46,9 @@ async function getDrivers() {
     // ce dashboard le lit, et le CIN ne sort jamais d'ici.
     supabaseAdmin
       .from("driver_identity")
-      .select("driver_id, cin, contract_signed_at, contract_legalized_at, verified_at")
+      .select(
+        "driver_id, cin, contract_signed_at, contract_legalized_at, contract_scan_path, verified_at"
+      )
       .in(
         "driver_id",
         drivers.map((d) => d.id)
@@ -60,6 +67,7 @@ async function getDrivers() {
     cin: string | null;
     contract_signed_at?: string | null;
     contract_legalized_at?: string | null;
+    contract_scan_path?: string | null;
     verified_at?: string | null;
   };
   let identityRows: IdentityRow[] | null =
@@ -103,12 +111,12 @@ async function getDrivers() {
 
   return drivers.map((d) => {
     const ident = identities[d.id] ?? null;
-    // Le critere est le CIN ET la date de legalisation. Le scan du contrat
-    // est facultatif : c'est une piece jointe, pas la preuve.
-    const verified = Boolean(ident?.cin && ident?.contract_legalized_at);
-    const missing: string[] = [];
-    if (!ident?.cin) missing.push("CIN");
-    if (!ident?.contract_legalized_at) missing.push("contrat");
+    // Trois pieces : CIN, date de legalisation, scan du contrat. Le critere
+    // est ecrit une seule fois (lib/driver-verification.ts) et dit la meme
+    // chose que driver_is_verified() en base, qui est ce qui AUTORISE
+    // reellement un livreur a travailler.
+    const verified = isDossierComplete(ident);
+    const missing = missingPieces(ident);
 
     return {
       ...d,
@@ -151,7 +159,7 @@ export default async function LivreursPage() {
     d.profile?.phone ?? "—",
     d.is_blocked ? "Bloqué" : "Actif",
     d.is_online ? "En ligne" : "Hors ligne",
-    d.verified ? "Vérifié" : `En attente (${d.missing.join(" + ")} manquant)`,
+    dossierStatusLabel(d.identity),
     String(d.stats?.count ?? 0),
     (d.stats?.totalFees ?? 0).toFixed(3),
     (d.stats?.totalCuts ?? 0).toFixed(3),
@@ -177,8 +185,9 @@ export default async function LivreursPage() {
             Base incomplète : les colonnes de dossier sont absentes
           </p>
           <p className="text-sm text-red-700 mt-1">
-            Seul le CIN est lisible ; le contrat ne peut être ni affiché ni
-            enregistré. Lancez{" "}
+            Seul le CIN est lisible ; ni le contrat ni son scan ne peuvent être
+            affichés ou enregistrés, et aucun livreur n&apos;apparaîtra comme
+            vérifié. Lancez{" "}
             <code className="px-1 bg-red-100 rounded">
               20261015103000_driver_verification_repair.sql
             </code>
@@ -194,7 +203,8 @@ export default async function LivreursPage() {
             dossier complet
           </p>
           <p className="text-sm text-amber-800 mt-1">
-            Il leur manque le CIN ou le contrat légalisé. Tant que
+            Il leur manque le CIN, la date de légalisation ou le scan du
+            contrat — les trois sont exigés. Tant que
             <code className="mx-1 px-1 bg-amber-100 rounded">
               driver_verification_required
             </code>
