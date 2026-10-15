@@ -48,6 +48,35 @@ async function getDrivers() {
       ),
   ]);
 
+  // Repli quand les colonnes de dossier manquent encore en base (cas vecu :
+  // 20261015090000 a rapporte Success sans les poser). Un select qui echoue
+  // renvoie data = null, et chaque livreur paraitrait alors sans CIN -- y
+  // compris ceux qui en ont un. On redemande le minimum qui existe a coup sur.
+  // Type elargi : le repli ne ramene que driver_id et cin, les autres champs
+  // sont alors absents -- ce que le reste du code traite deja comme « non
+  // renseigne ».
+  type IdentityRow = {
+    driver_id: string;
+    cin: string | null;
+    contract_signed_at?: string | null;
+    contract_legalized_at?: string | null;
+    verified_at?: string | null;
+  };
+  let identityRows: IdentityRow[] | null =
+    identityRes.data as IdentityRow[] | null;
+  let schemaIncomplete = false;
+  if (identityRes.error) {
+    schemaIncomplete = true;
+    const fallback = await supabaseAdmin
+      .from("driver_identity")
+      .select("driver_id, cin")
+      .in(
+        "driver_id",
+        drivers.map((d) => d.id)
+      );
+    identityRows = fallback.data as IdentityRow[] | null;
+  }
+
   const profiles = Object.fromEntries(
     (profilesRes.data ?? []).map((p) => [p.id, p])
   );
@@ -69,7 +98,7 @@ async function getDrivers() {
   }
 
   const identities = Object.fromEntries(
-    (identityRes.data ?? []).map((i) => [i.driver_id, i])
+    (identityRows ?? []).map((i) => [i.driver_id, i])
   );
 
   return drivers.map((d) => {
@@ -89,6 +118,7 @@ async function getDrivers() {
       identity: ident,
       verified,
       missing,
+      schemaIncomplete,
     };
   });
 }
@@ -140,6 +170,22 @@ export default async function LivreursPage() {
           rows={exportRows}
         />
       </div>
+
+      {drivers.some((d) => d.schemaIncomplete) && (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+          <p className="font-semibold text-red-800">
+            Base incomplète : les colonnes de dossier sont absentes
+          </p>
+          <p className="text-sm text-red-700 mt-1">
+            Seul le CIN est lisible ; le contrat ne peut être ni affiché ni
+            enregistré. Lancez{" "}
+            <code className="px-1 bg-red-100 rounded">
+              20261015103000_driver_verification_repair.sql
+            </code>
+            , puis rechargez cette page.
+          </p>
+        </div>
+      )}
 
       {pendingVerification > 0 && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">

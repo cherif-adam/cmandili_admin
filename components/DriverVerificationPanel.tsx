@@ -14,11 +14,14 @@ import { ShieldCheck, ShieldAlert } from "lucide-react";
  * Le CIN n'est affiché QUE sur ce dashboard : ni l'app client ni l'app
  * livreur n'ont de policy sur la table qui le porte.
  */
+/// Les trois derniers champs sont OPTIONNELS : quand les colonnes de dossier
+/// manquent encore en base, la page se replie sur un select reduit et ne
+/// ramene que le CIN. Absent et null se traitent pareil — « non renseigne ».
 export interface DriverIdentity {
   cin: string | null;
-  contract_signed_at: string | null;
-  contract_legalized_at: string | null;
-  verified_at: string | null;
+  contract_signed_at?: string | null;
+  contract_legalized_at?: string | null;
+  verified_at?: string | null;
 }
 
 export default function DriverVerificationPanel({

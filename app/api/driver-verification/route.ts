@@ -48,6 +48,21 @@ export async function PATCH(req: NextRequest) {
     .upsert(patch, { onConflict: "driver_id" });
 
   if (error) {
+    // 42703 = la colonne n'existe pas. C'est arrivé : 20261015090000 a
+    // rapporté Success sans que ses colonnes de dossier soient en place, et
+    // l'admin aurait vu une erreur Postgres brute, illisible, en essayant
+    // d'enregistrer un contrat. On nomme la cause et le remède.
+    if (error.code === "42703" || /does not exist/i.test(error.message)) {
+      return NextResponse.json(
+        {
+          error:
+            "La base n'a pas les colonnes de dossier (contrat, vérification). " +
+            "Lancez supabase/migrations/20261015103000_driver_verification_repair.sql, " +
+            "puis réessayez.",
+        },
+        { status: 503 }
+      );
+    }
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
