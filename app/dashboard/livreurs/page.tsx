@@ -15,7 +15,7 @@ async function getDrivers() {
 
   const userIds = drivers.map((d) => d.user_id);
 
-  const [profilesRes, walletsRes, deliveriesRes] = await Promise.all([
+  const [profilesRes, walletsRes, deliveriesRes, identityRes] = await Promise.all([
     supabaseAdmin
       .from("profiles")
       .select("id, full_name, phone")
@@ -33,6 +33,15 @@ async function getDrivers() {
       .from("orders")
       .select("driver_id, delivery_fee, driver_fee_cut")
       .eq("status", "delivered")
+      .in(
+        "driver_id",
+        drivers.map((d) => d.id)
+      ),
+    // Dossier de verification. driver_identity est admin-only en RLS ; seul
+    // ce dashboard le lit, et le CIN ne sort jamais d'ici.
+    supabaseAdmin
+      .from("driver_identity")
+      .select("driver_id, cin, contract_signed_at, contract_legalized_at, verified_at")
       .in(
         "driver_id",
         drivers.map((d) => d.id)
@@ -59,12 +68,29 @@ async function getDrivers() {
     deliveriesByDriver[o.driver_id].totalCuts += o.driver_fee_cut ?? 0;
   }
 
-  return drivers.map((d) => ({
-    ...d,
-    profile: profiles[d.user_id] ?? null,
-    wallet: wallets[d.user_id] ?? null,
-    stats: deliveriesByDriver[d.id] ?? { count: 0, totalFees: 0, totalCuts: 0 },
-  }));
+  const identities = Object.fromEntries(
+    (identityRes.data ?? []).map((i) => [i.driver_id, i])
+  );
+
+  return drivers.map((d) => {
+    const ident = identities[d.id] ?? null;
+    // Le critere est le CIN ET la date de legalisation. Le scan du contrat
+    // est facultatif : c'est une piece jointe, pas la preuve.
+    const verified = Boolean(ident?.cin && ident?.contract_legalized_at);
+    const missing: string[] = [];
+    if (!ident?.cin) missing.push("CIN");
+    if (!ident?.contract_legalized_at) missing.push("contrat");
+
+    return {
+      ...d,
+      profile: profiles[d.user_id] ?? null,
+      wallet: wallets[d.user_id] ?? null,
+      stats: deliveriesByDriver[d.id] ?? { count: 0, totalFees: 0, totalCuts: 0 },
+      identity: ident,
+      verified,
+      missing,
+    };
+  });
 }
 
 export default async function LivreursPage() {
@@ -80,16 +106,22 @@ export default async function LivreursPage() {
     .filter((d) => (d.wallet?.balance ?? 0) < 0)
     .reduce((s, d) => s + Math.abs(d.wallet?.balance ?? 0), 0);
 
+  // Combien de livreurs seraient bloques si on activait le durcissement
+  // maintenant. C'est ce chiffre qui dit quand basculer
+  // driver_verification_required a 'on' sans priver la plateforme de livreurs.
+  const pendingVerification = drivers.filter((d) => !d.verified).length;
+
   // Export: one row per driver
   const exportColumns = [
     "Nom", "Téléphone", "Statut", "En ligne",
-    "Livraisons", "Frais collectés (TND)", "Commission due (TND)", "Solde wallet (TND)",
+    "Vérification", "Livraisons", "Frais collectés (TND)", "Commission due (TND)", "Solde wallet (TND)",
   ];
   const exportRows = drivers.map((d) => [
     d.profile?.full_name ?? "—",
     d.profile?.phone ?? "—",
     d.is_blocked ? "Bloqué" : "Actif",
     d.is_online ? "En ligne" : "Hors ligne",
+    d.verified ? "Vérifié" : `En attente (${d.missing.join(" + ")} manquant)`,
     String(d.stats?.count ?? 0),
     (d.stats?.totalFees ?? 0).toFixed(3),
     (d.stats?.totalCuts ?? 0).toFixed(3),
@@ -108,6 +140,24 @@ export default async function LivreursPage() {
           rows={exportRows}
         />
       </div>
+
+      {pendingVerification > 0 && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+          <p className="font-semibold text-amber-900">
+            {pendingVerification} livreur{pendingVerification > 1 ? "s" : ""} sans
+            dossier complet
+          </p>
+          <p className="text-sm text-amber-800 mt-1">
+            Il leur manque le CIN ou le contrat légalisé. Tant que
+            <code className="mx-1 px-1 bg-amber-100 rounded">
+              driver_verification_required
+            </code>
+            vaut <b>off</b>, ils travaillent normalement. Complétez leurs
+            dossiers avant de passer le réglage à <b>on</b>, sinon ils seront
+            tous bloqués d&apos;un coup.
+          </p>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatsCard

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import StatementModal from "@/components/StatementModal";
 import ContactActions from "@/components/ContactActions";
 import TopUpButton from "@/components/TopUpButton";
+import DriverVerificationPanel, { DriverIdentity } from "@/components/DriverVerificationPanel";
 
 interface DriverData {
   id: string;
@@ -16,6 +17,9 @@ interface DriverData {
   profile: { full_name: string; phone: string } | null;
   wallet: { balance: number; status: string } | null;
   stats: { count: number; totalFees: number; totalCuts: number };
+  identity?: DriverIdentity | null;
+  verified?: boolean;
+  missing?: string[];
 }
 
 export default function DriverRow({ driver }: { driver: DriverData }) {
@@ -24,6 +28,7 @@ export default function DriverRow({ driver }: { driver: DriverData }) {
   const [isBlocked,     setIsBlocked]     = useState(driver.is_blocked);
   const [feedback,      setFeedback]      = useState<{ ok: boolean; msg: string } | null>(null);
   const [showStatement, setShowStatement] = useState(false);
+  const [showVerif,     setShowVerif]     = useState(false);
 
   async function toggleBlock() {
     setLoading(true);
@@ -55,7 +60,10 @@ export default function DriverRow({ driver }: { driver: DriverData }) {
   const phone   = driver.profile?.phone     ?? "—";
   const balance = driver.wallet?.balance    ?? 0;
 
+  const verified = driver.verified ?? true;
+
   return (
+    <>
     <tr className="border-b border-gray-800 hover:bg-gray-800/40 transition-colors">
       {/* StatementModal renders as position:fixed — visually escapes the table */}
       {showStatement && (
@@ -149,8 +157,31 @@ export default function DriverRow({ driver }: { driver: DriverData }) {
               {feedback.msg}
             </span>
           )}
+          <button
+            onClick={() => setShowVerif((v) => !v)}
+            className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${
+              verified
+                ? "bg-green-500/20 text-green-400 hover:bg-green-500/30"
+                : "bg-amber-500/20 text-amber-300 hover:bg-amber-500/30"
+            }`}
+          >
+            {verified ? "Vérifié" : `En attente (${(driver.missing ?? []).join(" + ")})`}
+          </button>
         </div>
       </td>
     </tr>
+    {showVerif && (
+      <tr className="border-b border-gray-800 bg-gray-900/60">
+        <td colSpan={8} className="p-3">
+          <DriverVerificationPanel
+            driverId={driver.id}
+            identity={driver.identity ?? null}
+            verified={verified}
+            missing={driver.missing ?? []}
+          />
+        </td>
+      </tr>
+    )}
+    </>
   );
 }
