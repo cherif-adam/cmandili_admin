@@ -10,6 +10,7 @@ import {
   isDossierComplete,
   missingPieces,
 } from "@/lib/driver-verification";
+import { DriverContract } from "@/lib/driver-contract";
 
 async function getDrivers() {
   const { data: drivers } = await supabaseAdmin
@@ -109,6 +110,23 @@ async function getDrivers() {
     (identityRows ?? []).map((i) => [i.driver_id, i])
   );
 
+  // Contrat envoyé / renvoyé dans l'appli (20261026120000). Tant que la table
+  // n'existe pas, la requête échoue et chaque livreur est « aucun contrat ».
+  const contractsRes = await supabaseAdmin
+    .from("driver_contracts")
+    .select(
+      "driver_id, status, to_sign_path, sent_at, signed_path, submitted_at, admin_note, reviewed_at"
+    )
+    .in(
+      "driver_id",
+      drivers.map((d) => d.id)
+    );
+  const contracts = Object.fromEntries(
+    ((contractsRes.data ?? []) as (DriverContract & { driver_id: string })[]).map(
+      ({ driver_id, ...c }) => [driver_id, c]
+    )
+  );
+
   return drivers.map((d) => {
     const ident = identities[d.id] ?? null;
     // Trois pieces : CIN, date de legalisation, scan du contrat. Le critere
@@ -124,6 +142,7 @@ async function getDrivers() {
       wallet: wallets[d.user_id] ?? null,
       stats: deliveriesByDriver[d.id] ?? { count: 0, totalFees: 0, totalCuts: 0 },
       identity: ident,
+      contract: (contracts[d.id] ?? null) as DriverContract | null,
       verified,
       missing,
       schemaIncomplete,

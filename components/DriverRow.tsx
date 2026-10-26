@@ -6,6 +6,7 @@ import StatementModal from "@/components/StatementModal";
 import ContactActions from "@/components/ContactActions";
 import TopUpButton from "@/components/TopUpButton";
 import DriverVerificationPanel, { DriverIdentity } from "@/components/DriverVerificationPanel";
+import { DriverContract } from "@/lib/driver-contract";
 
 interface DriverData {
   id: string;
@@ -18,6 +19,7 @@ interface DriverData {
   wallet: { balance: number; status: string } | null;
   stats: { count: number; totalFees: number; totalCuts: number };
   identity?: DriverIdentity | null;
+  contract?: DriverContract | null;
   verified?: boolean;
   missing?: string[];
 }
@@ -178,6 +180,7 @@ export default function DriverRow({ driver }: { driver: DriverData }) {
           <DriverVerificationPanel
             driverId={driver.id}
             identity={driver.identity ?? null}
+            contract={driver.contract ?? null}
             verified={verified}
             missing={driver.missing ?? []}
           />

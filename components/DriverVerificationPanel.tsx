@@ -14,6 +14,8 @@ import {
   SCAN_ACCEPT,
   scanSizeError,
 } from "@/lib/driver-verification";
+import { DriverContract } from "@/lib/driver-contract";
+import DriverContractExchange from "@/components/DriverContractExchange";
 
 /**
  * Dossier de vérification d'un livreur, saisi en présentiel au recrutement.
@@ -51,11 +53,13 @@ export default function DriverVerificationPanel({
   identity,
   verified,
   missing,
+  contract = null,
 }: {
   driverId: string;
   identity: DriverIdentity | null;
   verified: boolean;
   missing: string[];
+  contract?: DriverContract | null;
 }) {
   const router = useRouter();
   const [cin, setCin] = useState(identity?.cin ?? "");
@@ -313,6 +317,13 @@ export default function DriverVerificationPanel({
           </p>
         )}
       </div>
+
+      {/* ── Contrat envoyé / renvoyé dans l'appli ─────────────────────── */}
+      <DriverContractExchange
+        driverId={driverId}
+        contract={contract}
+        hasRecord={hasRecord}
+      />
     </div>
   );
 }
