@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { logAudit, requireAdmin } from "@/lib/audit";
+import { formatMoneyStep, parseMoneyStep } from "@/lib/money-step";
 
 export async function POST(req: NextRequest) {
   const user = await requireAdmin();
   if (!user) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await req.json();
-  const { restaurant_rate, driver_rate, max_discount_percent } = body;
+  const { restaurant_rate, driver_rate, max_discount_percent, money_rounding_step } = body;
 
   if (
     typeof restaurant_rate !== "number" || restaurant_rate <= 0 || restaurant_rate >= 1 ||
@@ -32,10 +33,21 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Le pas d'arrondi des montants, lu par public.round_money(x) à chaque
+  // calcul : frais, remise fidélité, commissions, prix promo.
+  const step = parseMoneyStep(money_rounding_step);
+  if (step === null) {
+    return NextResponse.json(
+      { error: "Le pas d'arrondi doit être entre 0,001 et 1 DT, en millimes entiers" },
+      { status: 400 }
+    );
+  }
+
   const updates = [
     { setting_key: "default_restaurant_commission_rate", setting_value: restaurant_rate.toString() },
     { setting_key: "default_driver_commission_rate", setting_value: driver_rate.toString() },
     { setting_key: "max_discount_percent", setting_value: max_discount_percent.toString() },
+    { setting_key: "money_rounding_step", setting_value: formatMoneyStep(step) },
   ];
 
   for (const u of updates) {
@@ -60,7 +72,7 @@ export async function POST(req: NextRequest) {
     admin_email: user.email ?? "unknown",
     action_type: "update_commission_rates",
     target_type: "settings",
-    details: { restaurant_rate, driver_rate, max_discount_percent },
+    details: { restaurant_rate, driver_rate, max_discount_percent, money_rounding_step: step },
   });
   return NextResponse.json({ ok: true });
 }

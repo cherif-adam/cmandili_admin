@@ -1,21 +1,25 @@
 "use client";
 
 import { useState } from "react";
+import { formatMoneyStep, parseMoneyStep } from "@/lib/money-step";
 
 interface Props {
   restaurantRate: number;
   driverRate: number;
   maxDiscountPercent: number;
+  moneyRoundingStep: number;
 }
 
 export default function SettingsForm({
   restaurantRate,
   driverRate,
   maxDiscountPercent,
+  moneyRoundingStep,
 }: Props) {
   const [restPct, setRestPct] = useState((restaurantRate * 100).toFixed(2));
   const [drivPct, setDrivPct] = useState((driverRate * 100).toFixed(2));
   const [maxPct, setMaxPct] = useState(String(maxDiscountPercent));
+  const [stepText, setStepText] = useState(formatMoneyStep(moneyRoundingStep));
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState<{ ok: boolean; msg: string } | null>(null);
 
@@ -43,6 +47,13 @@ export default function SettingsForm({
       return;
     }
 
+    const step = parseMoneyStep(stepText);
+    if (step === null) {
+      setFeedback({ ok: false, msg: "Le pas d'arrondi doit être entre 0,001 et 1 DT, en millimes entiers" });
+      setLoading(false);
+      return;
+    }
+
     try {
       const res = await fetch("/api/settings", {
         method: "POST",
@@ -51,6 +62,7 @@ export default function SettingsForm({
           restaurant_rate: rr,
           driver_rate: dr,
           max_discount_percent: mp,
+          money_rounding_step: step,
         }),
       });
       const json = await res.json();
@@ -143,6 +155,33 @@ export default function SettingsForm({
         </div>
         <p className="text-xs text-gray-500">
           Valeur actuelle en DB : {maxDiscountPercent} %
+        </p>
+      </div>
+
+      {/* Pas d'arrondi des montants */}
+      <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 space-y-3">
+        <div>
+          <h3 className="font-semibold text-white">Arrondi des montants</h3>
+          <p className="text-xs text-gray-400 mt-1">
+            Frais de livraison, remise fidélité, commissions et prix promo sont
+            arrondis au multiple de ce pas le plus proche. 0,050 DT = 50 millimes ;
+            0,001 revient au calcul au millime. S&apos;applique aux nouvelles commandes.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <input
+            type="number"
+            step="0.001"
+            min="0.001"
+            max="1"
+            value={stepText}
+            onChange={(e) => setStepText(e.target.value)}
+            className="w-28 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-orange-500"
+          />
+          <span className="text-gray-400 text-sm">DT</span>
+        </div>
+        <p className="text-xs text-gray-500">
+          Valeur actuelle en DB : {formatMoneyStep(moneyRoundingStep)} DT
         </p>
       </div>
 

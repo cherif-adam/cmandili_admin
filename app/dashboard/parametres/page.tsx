@@ -1,5 +1,6 @@
 export const dynamic = 'force-dynamic'
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { DEFAULT_MONEY_STEP, parseMoneyStep } from "@/lib/money-step";
 import SettingsForm from "./SettingsForm";
 import ChangePasswordForm from "./ChangePasswordForm";
 import { Settings } from "lucide-react";
@@ -13,6 +14,7 @@ async function getSettings() {
       "default_restaurant_commission_rate",
       "default_driver_commission_rate",
       "max_discount_percent",
+      "money_rounding_step",
     ]);
 
   const map = Object.fromEntries((data ?? []).map((r) => [r.setting_key, parseFloat(r.setting_value)]));
@@ -21,11 +23,14 @@ async function getSettings() {
     driverRate: map["default_driver_commission_rate"] ?? 0.23,
     // Meme repli que l'app partenaire quand la ligne est illisible : 70 %.
     maxDiscountPercent: map["max_discount_percent"] ?? 70,
+    // Meme repli que public.round_money quand la ligne manque : 50 millimes.
+    moneyRoundingStep: parseMoneyStep(map["money_rounding_step"]) ?? DEFAULT_MONEY_STEP,
   };
 }
 
 export default async function ParametresPage() {
-  const { restaurantRate, driverRate, maxDiscountPercent } = await getSettings();
+  const { restaurantRate, driverRate, maxDiscountPercent, moneyRoundingStep } =
+    await getSettings();
 
   return (
     <div className="space-y-4">
@@ -33,7 +38,7 @@ export default async function ParametresPage() {
         <PageHeader
           icon={Settings}
           title="Paramètres"
-          subtitle="Commissions, plafond de remise et mot de passe"
+          subtitle="Commissions, arrondi des montants, plafond de remise et mot de passe"
         />
       </div>
 
@@ -41,6 +46,7 @@ export default async function ParametresPage() {
         restaurantRate={restaurantRate}
         driverRate={driverRate}
         maxDiscountPercent={maxDiscountPercent}
+        moneyRoundingStep={moneyRoundingStep}
       />
 
       {/* Le changement de mot de passe se fait entierement cote navigateur,
