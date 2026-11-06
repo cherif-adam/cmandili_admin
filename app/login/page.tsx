@@ -9,7 +9,11 @@ import { Lock, Mail, AlertCircle, ArrowLeft, CheckCircle } from "lucide-react";
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [view, setView] = useState<"login" | "forgot">("login");
+  // `/login?view=forgot` opens straight on the reset request: the expired-link
+  // screen of /reset-password sends the admin here.
+  const [view, setView] = useState<"login" | "forgot">(() =>
+    searchParams.get("view") === "forgot" ? "forgot" : "login"
+  );
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -95,41 +99,51 @@ function LoginForm() {
     e.preventDefault();
     setError(null);
 
-    if (!email.trim()) {
+    const address = email.trim();
+    if (!address) {
       setError("Entrez votre adresse email.");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)) {
+      setError("Cette adresse email n'est pas valide.");
       return;
     }
 
     setLoading(true);
 
     try {
-      // No redirectTo: the project's shared "Reset password" template sends an
-      // 8-digit code, not a magic link, so there is no link to come back on.
-      // The three mobile apps already consume it that way; passing a redirect
-      // here only produced a link the template never renders.
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(
-        email.trim()
-      );
+      // redirectTo = this dashboard's own reset page, on whatever domain it is
+      // served from. Supabase only honours it if it is in Auth > URL
+      // Configuration > Redirect URLs; the "Reset password" template shows the
+      // admin link only when it differs from the Site URL, so the mobile apps
+      // (which pass none) keep their code-only email. See cmandili_context.md.
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(address, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
 
       if (resetError) {
-        setError("Impossible d'envoyer l'email. Vérifiez l'adresse et réessayez.");
+        // Never the raw message: say what the admin can do about it.
+        const m = resetError.message.toLowerCase();
+        const status = resetError.status ?? 0;
+        if (status === 429 || m.includes("rate limit") || m.includes("security purposes")) {
+          setError(
+            "Trop de demandes d'email en peu de temps. Patientez quelques minutes avant de réessayer."
+          );
+        } else if (m.includes("fetch") || m.includes("network")) {
+          setError("Problème de connexion. Vérifiez votre réseau et réessayez.");
+        } else if (m.includes("invalid") && m.includes("email")) {
+          setError("Cette adresse email n'est pas valide.");
+        } else {
+          setError(
+            "L'email n'a pas pu être envoyé pour le moment. Réessayez dans quelques minutes."
+          );
+        }
         return;
       }
 
-      // Supabase repond « ok » meme pour une adresse qui n'a pas de compte --
-      // c'est voulu, cela evite de reveler qui est inscrit. Annoncer « Code
-      // envoye ! » etait donc faux des qu'on se trompait d'adresse : on
-      // attendait un email qui ne partirait jamais. On le dit comme c'est.
-      setSuccess(
-        `Si un compte existe pour ${email.trim()}, un code à 8 chiffres vient d'être envoyé. ` +
-          "Vérifiez votre boîte mail et le dossier spam ; sans rien au bout de " +
-          "quelques minutes, c'est que l'adresse n'est pas la bonne."
-      );
-      // Straight to the code screen, with the address prefilled.
-      setTimeout(
-        () => router.push(`/reset-password?email=${encodeURIComponent(email.trim())}`),
-        3500
-      );
+      // Supabase answers "ok" even for an address without an account -- on
+      // purpose, so as not to reveal who is registered. Say exactly that.
+      setSuccess("Si cet email existe, un lien de réinitialisation a été envoyé.");
     } catch {
       setError("Une erreur inattendue s'est produite. Réessayez.");
     } finally {
@@ -154,7 +168,7 @@ function LoginForm() {
             Réinitialiser le mot de passe
           </h2>
           <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
-            Entrez votre email pour recevoir un code à 8 chiffres.
+            Entrez votre email pour recevoir un lien de réinitialisation.
           </p>
         </div>
 
@@ -166,9 +180,25 @@ function LoginForm() {
         )}
 
         {success ? (
-          <div className="flex items-start gap-2.5 bg-green-500/10 border border-green-500/30 rounded-lg px-3 py-2.5">
-            <CheckCircle size={16} className="text-green-400 mt-0.5 shrink-0" />
-            <p className="text-sm text-green-400">{success}</p>
+          <div className="space-y-3">
+            <div className="flex items-start gap-2.5 bg-green-500/10 border border-green-500/30 rounded-lg px-3 py-2.5">
+              <CheckCircle size={16} className="text-green-400 mt-0.5 shrink-0" />
+              <p className="text-sm text-green-400">{success}</p>
+            </div>
+            <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+              Pensez à regarder dans le dossier spam. L&apos;email contient aussi un
+              code à 8 chiffres, utilisable si le lien ne s&apos;ouvre pas.
+            </p>
+            <button
+              type="button"
+              onClick={() =>
+                router.push(`/reset-password?email=${encodeURIComponent(email.trim())}`)
+              }
+              className="w-full rounded px-1 py-1 text-xs underline underline-offset-2 transition-opacity hover:opacity-70 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
+              style={{ color: "var(--brand-text)" }}
+            >
+              Saisir le code reçu
+            </button>
           </div>
         ) : (
           <form onSubmit={handleForgot} noValidate className="space-y-4">
@@ -198,7 +228,7 @@ function LoginForm() {
               disabled={loading}
               className="w-full bg-orange-500 hover:bg-orange-400 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-sm py-2.5 rounded-lg transition-colors"
             >
-              {loading ? "Envoi…" : "Envoyer le code"}
+              {loading ? "Envoi…" : "Envoyer le lien"}
             </button>
 
             {/* Pour qui a deja recu son code et n'a pas besoin d'en redemander
